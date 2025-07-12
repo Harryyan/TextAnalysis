@@ -11,22 +11,27 @@ import SwiftData
 @main
 struct TextAnalysisApp: App {
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+            return try ModelContainer(for: Item.self, configurations: configuration)
         } catch {
+            print("Failed to create ModelContainer: \(error)")
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentViewWrapper()
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+struct ContentViewWrapper: View {
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        ContentView(viewModel: DIContainer.shared.makeFileListViewModel(modelContext: modelContext))
     }
 }

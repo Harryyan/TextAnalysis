@@ -7,55 +7,112 @@
 
 import SwiftUI
 import SwiftData
+import PDFKit
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @State var viewModel: FileListViewModel
+    
     var body: some View {
         NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+            List(selection: $viewModel.selectedFile) {
+                ForEach(viewModel.files) { file in
+                    NavigationLink(value: file) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(file.fileName)
+                                .font(.headline)
+                            Text(file.fileType.displayName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .onDelete { offsets in
+                    Task {
+                        await viewModel.deleteFiles(at: offsets)
+                    }
+                }
             }
+            .navigationTitle("Files")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
                 }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+            }
+            .task {
+                await viewModel.loadFiles()
+            }
+            .overlay {
+                if viewModel.isLoading {
+                    ProgressView("Loading files...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.1))
+                }
+            }
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
                 }
             }
         } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            if let selectedFile = viewModel.selectedFile {
+                FileDetailView(file: selectedFile)
+            } else {
+                Text("Select a file to view its content")
+                    .foregroundColor(.secondary)
             }
         }
     }
 }
 
+struct FileDetailView: View {
+    let file: FileDocument
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with file info
+            VStack(alignment: .leading, spacing: 8) {
+                Text(file.fileName)
+                    .font(.title2)
+                    .bold()
+                
+                HStack {
+                    Text("Type: \(file.fileType.displayName)")
+                    Spacer()
+                    Text("Loaded: \(file.timestamp, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            
+            // Content based on file type
+            if file.fileType == .pdf, let url = file.url {
+                PDFViewWrapper(url: url)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    Text(file.content)
+                        .font(.body)
+                        .textSelection(.enabled)
+                        .padding()
+                }
+            }
+        }
+        .navigationTitle("File Content")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 #Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: Item.self, configurations: configuration)
+    let viewModel = DIContainer.shared.makeFileListViewModel(modelContext: container.mainContext)
+    
+    ContentView(viewModel: viewModel)
+        .modelContainer(container)
 }

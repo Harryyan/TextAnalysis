@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a SwiftUI iOS application called "TextAnalysis" that uses SwiftData for data persistence. The app currently has a basic master-detail interface with the ability to add and delete timestamped items.
+This is a PDF and Text file reader project(SwiftUI) and aiming to use Apple's new foundation model apis to summarize the text content from PDF and Text files.
 
 ## Architecture
 
