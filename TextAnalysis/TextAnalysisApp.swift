@@ -13,7 +13,7 @@ struct TextAnalysisApp: App {
     var sharedModelContainer: ModelContainer = {
         do {
             let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
-            return try ModelContainer(for: Item.self, configurations: configuration)
+            return try ModelContainer(for: Item.self, AnalysisResult.self, configurations: configuration)
         } catch {
             print("Failed to create ModelContainer: \(error)")
             fatalError("Could not create ModelContainer: \(error)")

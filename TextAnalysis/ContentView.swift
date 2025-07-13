@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import PDFKit
+import FoundationModels
 
 struct ContentView: View {
     @State var viewModel: FileListViewModel
@@ -70,6 +71,7 @@ struct ContentView: View {
 
 struct FileDetailView: View {
     let file: FileDocument
+    @State private var showingSummary = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -105,6 +107,31 @@ struct FileDetailView: View {
         }
         .navigationTitle("File Content")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingSummary = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "brain")
+                        Text("AI Summary")
+                    }
+                    .font(.callout)
+                }
+            }
+        }
+        .sheet(isPresented: $showingSummary) {
+            NavigationView {
+                StreamingSummaryView(document: file)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Close") {
+                                showingSummary = false
+                            }
+                        }
+                    }
+            }
+        }
     }
 }
 
