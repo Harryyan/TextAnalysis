@@ -22,23 +22,44 @@ struct StreamingSummaryView: View {
     @State private var contentHash: String = ""
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                headerSection
-                
-                if isGenerating {
-                    streamingProgressSection
-                } else if let summary = currentSummary {
-                    summaryDisplaySection(summary)
-                } else {
-                    generateButtonSection
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    headerSection
+                    
+                    if isGenerating {
+                        streamingProgressSection
+                    } else if let summary = currentSummary {
+                        summaryDisplaySection(summary)
+                            .id("completedSummary") // Add ID for scroll targeting
+                    } else {
+                        generateButtonSection
+                    }
+                    
+                    if let error = errorMessage {
+                        errorSection(error)
+                    }
                 }
-                
-                if let error = errorMessage {
-                    errorSection(error)
+                .padding()
+                .onChange(of: partialSummary) { _, newPartial in
+                    // Auto-scroll when new content is generated
+                    if newPartial != nil && isGenerating {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            proxy.scrollTo("streamingContent", anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: isGenerating) { _, generating in
+                    // Auto-scroll when generation completes
+                    if !generating && currentSummary != nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                proxy.scrollTo("completedSummary", anchor: .bottom)
+                            }
+                        }
+                    }
                 }
             }
-            .padding()
         }
         .navigationTitle("AI Summary")
         .navigationBarTitleDisplayMode(.inline)
@@ -116,6 +137,7 @@ struct StreamingSummaryView: View {
             
             if let partial = partialSummary {
                 StreamingContentView(partial: partial)
+                    .id("streamingContent") // Add ID for scroll targeting
             }
         }
         .padding()
