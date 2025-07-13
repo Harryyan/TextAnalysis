@@ -320,7 +320,7 @@ struct StreamingSummaryView: View {
             case .assetsUnavailable:
                 return "AI model is unavailable. Please ensure Apple Intelligence is enabled and try again later."
             case .guardrailViolation:
-                return "Content violates safety guidelines. Please try with different content."
+                return "Apple's AI safety system detected potentially sensitive content and cannot analyze this document. Please try with different content."
             case .unsupportedGuide:
                 return "Unsupported analysis pattern. Please try again."
             case .unsupportedLanguageOrLocale:
@@ -332,7 +332,7 @@ struct StreamingSummaryView: View {
             case .concurrentRequests:
                 return "Another analysis is in progress. Please wait and try again."
             @unknown default:
-                return "Generic error occurred. Please try again."
+                return "Foundation Models error (code: \(generationError._code)): \(generationError.localizedDescription). Please check if Apple Intelligence is enabled and try again."
             }
         }
         

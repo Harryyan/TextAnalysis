@@ -48,6 +48,9 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
             throw FoundationModelsError.sessionNotInitialized
         }
         
+        // Check if Foundation Models are available before attempting generation
+        print("Starting Foundation Models generation for \(fileType.displayName) content (\(content.count) characters)")
+        
         let processedContent = try preprocessContent(content)
         let prompt = buildSummaryPrompt(content: processedContent, fileType: fileType)
         
@@ -71,7 +74,14 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                     } catch {
                         continuation.finish(throwing: error)
                     }
+                } catch LanguageModelSession.GenerationError.guardrailViolation {
+                    print("Content triggered safety guardrails")
+                    continuation.finish(throwing: FoundationModelsError.generationFailed("Content may contain sensitive material that cannot be analyzed by Apple's AI models"))
                 } catch {
+                    print("Foundation Models generation failed: \(error)")
+                    if let generationError = error as? LanguageModelSession.GenerationError {
+                        print("Generation error details: \(generationError)")
+                    }
                     continuation.finish(throwing: FoundationModelsError.generationFailed(error.localizedDescription))
                 }
             }

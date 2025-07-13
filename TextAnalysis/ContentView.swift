@@ -93,33 +93,40 @@ struct FileDetailView: View {
             .background(Color(.systemGray6))
             
             // Content based on file type
-            if file.fileType == .pdf, let url = file.url {
-                PDFViewWrapper(url: url)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    Text(file.content)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .padding()
+            ZStack(alignment: .bottom) {
+                if file.fileType == .pdf, let url = file.url {
+                    PDFViewWrapper(url: url)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        Text(file.content)
+                            .font(.body)
+                            .textSelection(.enabled)
+                            .padding()
+                            .padding(.bottom, 80) // Add space for button
+                    }
                 }
+                
+                // AI Summary button at bottom center
+                Button(action: {
+                    showingSummary = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                        Text("Generate AI Summary")
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                }
+                .padding(.bottom, 20)
             }
         }
         .navigationTitle("File Content")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingSummary = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "brain")
-                        Text("AI Summary")
-                    }
-                    .font(.callout)
-                }
-            }
-        }
         .sheet(isPresented: $showingSummary) {
             NavigationView {
                 StreamingSummaryView(document: file)
