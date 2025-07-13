@@ -47,6 +47,12 @@ xcodebuild -project TextAnalysis.xcodeproj -scheme TextAnalysis test
 - UI updates wrapped in `withAnimation` for smooth transitions
 - Preview providers include `.modelContainer(for: Item.self, inMemory: true)` for SwiftData models
 
+## Swift Best Practices
+
+- **Use `final` keyword for classes without inheritance**: All classes that don't need subclassing should be marked as `final` (e.g., `final class FileRepository: FileRepositoryProtocol`)
+- **Prefer structs over classes**: Use structs for value types and data models when reference semantics aren't needed
+- **Protocol-oriented design**: Define protocols for dependencies and use dependency injection for testability
+
 ## Current State
 
 The app is a basic template with minimal functionality - it can add/delete items with timestamps. The name "TextAnalysis" suggests this is intended to be expanded into a text analysis application.

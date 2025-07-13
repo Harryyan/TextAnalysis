@@ -14,7 +14,7 @@ protocol LoadFilesUseCaseProtocol {
     func saveFile(_ file: FileDocument) async throws
 }
 
-class LoadFilesUseCase: LoadFilesUseCaseProtocol {
+final class LoadFilesUseCase: LoadFilesUseCaseProtocol {
     private let fileRepository: FileRepositoryProtocol
     
     init(fileRepository: FileRepositoryProtocol) {

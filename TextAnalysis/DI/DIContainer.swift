@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-class DIContainer {
+final class DIContainer {
     static let shared = DIContainer()
     
     private init() {}

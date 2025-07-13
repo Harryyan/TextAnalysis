@@ -13,7 +13,7 @@ protocol FileReaderServiceProtocol {
     func readFile(at url: URL) async -> String?
 }
 
-class FileReaderService: FileReaderServiceProtocol {
+final class FileReaderService: FileReaderServiceProtocol {
     
     func loadResourceFiles() async -> [FileDocument] {
         var documents: [FileDocument] = []
