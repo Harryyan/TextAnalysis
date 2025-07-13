@@ -13,6 +13,7 @@ struct StreamingSummaryView: View {
     let document: FileDocument
     @Environment(\.modelContext) private var modelContext
     @State private var currentSummary: StreamingDocumentSummary?
+    @State private var partialSummary: StreamingDocumentSummary.PartiallyGenerated?
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0.0
@@ -113,8 +114,8 @@ struct StreamingSummaryView: View {
             ProgressView(value: generationProgress, total: 1.0)
                 .progressViewStyle(LinearProgressViewStyle())
             
-            if let summary = currentSummary {
-                summaryDisplaySection(summary)
+            if let partial = partialSummary {
+                StreamingContentView(partial: partial)
             }
         }
         .padding()
@@ -228,10 +229,27 @@ struct StreamingSummaryView: View {
         
         Task {
             do {
-                for try await summary in foundationService.streamingSummarize(document.content, fileType: document.fileType) {
+                let stream = try await foundationService.streamingSummarize(document.content, fileType: document.fileType)
+                
+                for try await partial in stream {
                     await MainActor.run {
-                        currentSummary = summary
-                        generationProgress = 1.0 // Complete when we receive the summary
+                        partialSummary = partial
+                        updateProgress(partial)
+                        
+                        // If we have a complete summary, convert it
+                        if let title = partial.title,
+                           let overview = partial.overview,
+                           let keyPoints = partial.keyPoints,
+                           let conclusion = partial.conclusion,
+                           let readingTime = partial.estimatedReadingTimeMinutes {
+                            currentSummary = StreamingDocumentSummary(
+                                title: title,
+                                overview: overview,
+                                keyPoints: keyPoints,
+                                conclusion: conclusion,
+                                estimatedReadingTimeMinutes: readingTime
+                            )
+                        }
                     }
                 }
                 
@@ -243,6 +261,7 @@ struct StreamingSummaryView: View {
                         }
                     }
                     isGenerating = false
+                    generationProgress = 1.0
                 }
             } catch {
                 await MainActor.run {
@@ -276,7 +295,7 @@ struct StreamingSummaryView: View {
         
         do {
             if let existingResult = await repository.getCachedResult(for: contentHash) {
-                try await repository.updateSummary(for: contentHash, summary: summary)
+                try await repository.updateSummary(existingResult: existingResult, summary: summary)
             } else {
                 let newResult = AnalysisResult(
                     contentHash: contentHash,
@@ -293,10 +312,35 @@ struct StreamingSummaryView: View {
     
     
     private func handleError(_ error: Error) -> String {
+        // Handle Apple Foundation Models specific errors
+        if let generationError = error as? LanguageModelSession.GenerationError {
+            switch generationError {
+            case .exceededContextWindowSize:
+                return "Document is too long for analysis. The system will automatically handle this."
+            case .assetsUnavailable:
+                return "AI model is unavailable. Please ensure Apple Intelligence is enabled and try again later."
+            case .guardrailViolation:
+                return "Content violates safety guidelines. Please try with different content."
+            case .unsupportedGuide:
+                return "Unsupported analysis pattern. Please try again."
+            case .unsupportedLanguageOrLocale:
+                return "Unsupported language. Please try with English content."
+            case .decodingFailure:
+                return "Failed to process AI response. Please try again."
+            case .rateLimited:
+                return "Too many requests. Please wait and try again."
+            case .concurrentRequests:
+                return "Another analysis is in progress. Please wait and try again."
+            @unknown default:
+                return "Generic error occurred. Please try again."
+            }
+        }
+        
+        // Handle our custom service errors
         if let foundationError = error as? FoundationModelsError {
             switch foundationError {
             case .contextWindowExceeded:
-                return "Document is too long. Try with a shorter document or the system will automatically chunk it."
+                return "Document is too long for analysis."
             case .sessionTimeout:
                 return "Generation timed out. Please try again."
             case .contentTooLong:
@@ -309,7 +353,95 @@ struct StreamingSummaryView: View {
                 return "Invalid document content."
             }
         }
+        
         return "An unexpected error occurred: \(error.localizedDescription)"
+    }
+    
+    private func updateProgress(_ partial: StreamingDocumentSummary.PartiallyGenerated) {
+        var progress = 0.0
+        
+        if partial.title != nil { progress += 0.2 }
+        if partial.overview != nil { progress += 0.3 }
+        if let keyPoints = partial.keyPoints, !keyPoints.isEmpty {
+            progress += 0.3 * (Double(keyPoints.count) / 5.0)
+        }
+        if partial.conclusion != nil { progress += 0.2 }
+        
+        generationProgress = min(progress, 1.0)
+    }
+}
+
+struct StreamingContentView: View {
+    let partial: StreamingDocumentSummary.PartiallyGenerated
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let title = partial.title {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Title")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(title)
+                        .font(.headline)
+                        .bold()
+                }
+            }
+            
+            if let overview = partial.overview {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Overview")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(overview)
+                        .font(.body)
+                }
+            }
+            
+            if let keyPoints = partial.keyPoints, !keyPoints.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Key Points (\(keyPoints.count))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    ForEach(Array(keyPoints.enumerated()), id: \.offset) { index, point in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("•")
+                                .foregroundColor(.blue)
+                                .bold()
+                            Text(point)
+                                .font(.callout)
+                        }
+                    }
+                }
+            }
+            
+            if let conclusion = partial.conclusion {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Conclusion")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(conclusion)
+                        .font(.body)
+                }
+            }
+            
+            if let readingTime = partial.estimatedReadingTimeMinutes {
+                HStack {
+                    Image(systemName: "clock")
+                    Text("Estimated reading time: \(readingTime) minutes")
+                    Spacer()
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.top, 8)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

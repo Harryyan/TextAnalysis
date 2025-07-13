@@ -11,7 +11,6 @@ import SwiftData
 protocol AnalysisRepositoryProtocol {
     func getCachedResult(for contentHash: String) async -> AnalysisResult?
     func saveAnalysisResult(_ result: AnalysisResult) async throws
-    func updateSummary(for contentHash: String, summary: StreamingDocumentSummary) async throws
     func updateQuickAnalysis(for contentHash: String, analysis: QuickAnalysis) async throws
     func updateEntities(for contentHash: String, entities: EntityExtraction) async throws
     func clearExpiredResults(maxAge: TimeInterval) async throws
@@ -47,12 +46,8 @@ final class AnalysisRepository: AnalysisRepositoryProtocol {
         try modelContext.save()
     }
     
-    func updateSummary(for contentHash: String, summary: StreamingDocumentSummary) async throws {
-        guard let result = await getCachedResult(for: contentHash) else {
-            throw AnalysisRepositoryError.resultNotFound
-        }
-        
-        result.summary = summary
+    func updateSummary(existingResult: AnalysisResult, summary: StreamingDocumentSummary) async throws {
+        existingResult.summary = summary
         try modelContext.save()
     }
     

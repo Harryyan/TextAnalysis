@@ -13,12 +13,13 @@ struct StreamingDocumentSummary: Codable, Equatable {
     let title: String
     let overview: String
     
-    @Guide(count: 3...5)
+    @Guide(.minimumCount(3))
+    @Guide(.maximumCount(5))
     let keyPoints: [String]
     
     let conclusion: String
     
-    @Guide(1...100)
+    @Guide(.range(1...100))
     let estimatedReadingTimeMinutes: Int
 }
 
@@ -27,10 +28,11 @@ struct QuickAnalysis: Codable, Equatable {
     let documentType: DocumentCategory
     let complexity: ComplexityLevel
     
-    @Guide(count: 2...4)
+    @Guide(.minimumCount(2))
+    @Guide(.maximumCount(4))
     let mainTopics: [String]
     
-    @Guide(1.0...10.0)
+    @Guide(.range(1.0...10.0))
     let confidenceScore: Double
 }
 
@@ -56,15 +58,19 @@ enum ComplexityLevel: String, Codable, CaseIterable {
 
 @Generable
 struct EntityExtraction: Codable, Equatable {
-    @Guide(count: 0...10)
+    @Guide(.minimumCount(0))
+    @Guide(.maximumCount(10))
     let people: [String]
     
-    @Guide(count: 0...10)
+    @Guide(.minimumCount(0))
+    @Guide(.maximumCount(10))
     let organizations: [String]
     
-    @Guide(count: 0...10)
+    @Guide(.minimumCount(0))
+    @Guide(.maximumCount(10))
     let locations: [String]
     
-    @Guide(count: 0...15)
+    @Guide(.minimumCount(0))
+    @Guide(.maximumCount(15))
     let keyTerms: [String]
 }

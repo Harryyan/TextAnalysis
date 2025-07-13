@@ -18,7 +18,7 @@ enum FoundationModelsError: Error {
 }
 
 protocol FoundationModelsServiceProtocol {
-    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary, Error>
+    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary.PartiallyGenerated, Error>
     func quickAnalyze(_ content: String, fileType: FileType) async throws -> QuickAnalysis
     func extractEntities(_ content: String) async throws -> EntityExtraction
     func resetSession()
@@ -43,7 +43,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         initializeSession()
     }
     
-    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary, Error> {
+    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary.PartiallyGenerated, Error> {
         guard let session = session else {
             throw FoundationModelsError.sessionNotInitialized
         }
@@ -63,18 +63,16 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                         continuation.yield(summary)
                     }
                     continuation.finish()
-                } catch {
-                    if isContextWindowError(error) {
-                        do {
-                            let fallbackSummary = try await handleContextOverflow(content, fileType: fileType)
-                            continuation.yield(fallbackSummary)
-                            continuation.finish()
-                        } catch {
-                            continuation.finish(throwing: error)
-                        }
-                    } else {
-                        continuation.finish(throwing: FoundationModelsError.generationFailed(error.localizedDescription))
+                } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+                    do {
+                        let fallbackSummary = try await handleContextOverflow(content, fileType: fileType)
+                        continuation.yield(fallbackSummary.asPartiallyGenerated())
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
                     }
+                } catch {
+                    continuation.finish(throwing: FoundationModelsError.generationFailed(error.localizedDescription))
                 }
             }
         }
@@ -89,19 +87,20 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         let prompt = buildAnalysisPrompt(content: processedContent, fileType: fileType)
         
         do {
-            return try await session.respond(
+            let response = try await session.respond(
                 to: prompt,
                 generating: QuickAnalysis.self
             )
+            return response.content
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            let truncatedContent = truncateContent(processedContent, maxTokens: maxContextTokens / 2)
+            let shortPrompt = buildAnalysisPrompt(content: truncatedContent, fileType: fileType)
+            let response = try await session.respond(
+                to: shortPrompt,
+                generating: QuickAnalysis.self
+            )
+            return response.content
         } catch {
-            if isContextWindowError(error) {
-                let truncatedContent = truncateContent(processedContent, maxTokens: maxContextTokens / 2)
-                let shortPrompt = buildAnalysisPrompt(content: truncatedContent, fileType: fileType)
-                return try await session.respond(
-                    to: shortPrompt,
-                    generating: QuickAnalysis.self
-                )
-            }
             throw FoundationModelsError.generationFailed(error.localizedDescription)
         }
     }
@@ -115,19 +114,20 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         let prompt = buildEntityExtractionPrompt(content: processedContent)
         
         do {
-            return try await session.respond(
+            let response = try await session.respond(
                 to: prompt,
                 generating: EntityExtraction.self
             )
+            return response.content
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            let truncatedContent = truncateContent(processedContent, maxTokens: maxContextTokens / 2)
+            let shortPrompt = buildEntityExtractionPrompt(content: truncatedContent)
+            let response = try await session.respond(
+                to: shortPrompt,
+                generating: EntityExtraction.self
+            )
+            return response.content
         } catch {
-            if isContextWindowError(error) {
-                let truncatedContent = truncateContent(processedContent, maxTokens: maxContextTokens / 2)
-                let shortPrompt = buildEntityExtractionPrompt(content: truncatedContent)
-                return try await session.respond(
-                    to: shortPrompt,
-                    generating: EntityExtraction.self
-                )
-            }
             throw FoundationModelsError.generationFailed(error.localizedDescription)
         }
     }
@@ -268,24 +268,17 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         return truncated.isEmpty ? String(content.prefix(maxCharacters)) : truncated
     }
     
-    private func isContextWindowError(_ error: Error) -> Bool {
-        let errorDescription = error.localizedDescription.lowercased()
-        return errorDescription.contains("context") || 
-               errorDescription.contains("token") ||
-               errorDescription.contains("window") ||
-               errorDescription.contains("exceed")
-    }
     
     private func handleContextOverflow(_ content: String, fileType: FileType) async throws -> StreamingDocumentSummary {
         // For context overflow, generate a basic summary from truncated content
-        let truncatedContent = truncateContent(content, maxTokens: maxContextTokens / 2)
+        let estimatedMinutes = estimateTokenCount(content) / 200 // ~200 words per minute
         
         return StreamingDocumentSummary(
             title: "Summary (Truncated)",
             overview: "This is a partial summary due to document length limitations.",
             keyPoints: ["Document was too long for full analysis", "Summary based on first portion of content"],
             conclusion: "Full analysis requires document chunking.",
-            estimatedReadingTimeMinutes: estimateTokenCount(content) / 200 // ~200 words per minute
+            estimatedReadingTimeMinutes: estimatedMinutes
         )
     }
 }
