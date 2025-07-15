@@ -13,8 +13,8 @@ struct StreamingSummaryView: View {
     let document: FileDocument
     let foundationService: FoundationModelsService
     @Environment(\.modelContext) private var modelContext
-    @State private var currentSummary: StreamingDocumentSummary?
-    @State private var partialSummary: StreamingDocumentSummary.PartiallyGenerated?
+    @State private var currentSummary: DocumentSummary?
+    @State private var partialSummary: DocumentSummary.PartiallyGenerated?
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0.0
@@ -145,7 +145,7 @@ struct StreamingSummaryView: View {
         .cornerRadius(12)
     }
     
-    private func summaryDisplaySection(_ summary: StreamingDocumentSummary) -> some View {
+    private func summaryDisplaySection(_ summary: DocumentSummary) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             // Title
             VStack(alignment: .leading, spacing: 8) {
@@ -264,7 +264,7 @@ struct StreamingSummaryView: View {
                            let keyPoints = partial.keyPoints,
                            let conclusion = partial.conclusion,
                            let readingTime = partial.estimatedReadingTimeMinutes {
-                            currentSummary = StreamingDocumentSummary(
+                            currentSummary = DocumentSummary(
                                 title: title,
                                 overview: overview,
                                 keyPoints: keyPoints,
@@ -312,7 +312,7 @@ struct StreamingSummaryView: View {
         }
     }
     
-    private func cacheSummary(_ summary: StreamingDocumentSummary) async {
+    private func cacheSummary(_ summary: DocumentSummary) async {
         guard let repository = analysisRepository else { return }
         
         do {
@@ -379,7 +379,7 @@ struct StreamingSummaryView: View {
         return "An unexpected error occurred: \(error.localizedDescription)"
     }
     
-    private func updateProgress(_ partial: StreamingDocumentSummary.PartiallyGenerated) {
+    private func updateProgress(_ partial: DocumentSummary.PartiallyGenerated) {
         var progress = 0.0
         
         if partial.title != nil { progress += 0.2 }
@@ -394,7 +394,7 @@ struct StreamingSummaryView: View {
 }
 
 struct StreamingContentView: View {
-    let partial: StreamingDocumentSummary.PartiallyGenerated
+    let partial: DocumentSummary.PartiallyGenerated
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

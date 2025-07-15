@@ -25,7 +25,6 @@ final class ContentChunker {
         preserveContext: Bool = true
     ) -> [ContentChunk] {
         let maxCharacters = maxTokens * charactersPerToken
-        let overlapCharacters = overlapTokens * charactersPerToken
         
         if content.count <= maxCharacters {
             return [ContentChunk(
@@ -195,9 +194,9 @@ final class ContentChunker {
 }
 
 extension ContentChunker {
-    static func combineChunkSummaries(_ summaries: [StreamingDocumentSummary]) -> StreamingDocumentSummary {
+    static func combineChunkSummaries(_ summaries: [DocumentSummary]) -> DocumentSummary {
         guard !summaries.isEmpty else {
-            return StreamingDocumentSummary(
+            return DocumentSummary(
                 title: "Empty Document",
                 overview: "No content to summarize",
                 keyPoints: [],
@@ -222,7 +221,7 @@ extension ContentChunker {
         let combinedConclusion = "This document contains multiple sections with varying themes and complexity. " +
                                "Key insights span across \(summaries.count) main areas of content."
         
-        return StreamingDocumentSummary(
+        return DocumentSummary(
             title: combinedTitle,
             overview: combinedOverview,
             keyPoints: Array(uniqueKeyPoints),

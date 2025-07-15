@@ -46,7 +46,7 @@ final class AnalysisRepository: AnalysisRepositoryProtocol {
         try modelContext.save()
     }
     
-    func updateSummary(existingResult: AnalysisResult, summary: StreamingDocumentSummary) async throws {
+    func updateSummary(existingResult: AnalysisResult, summary: DocumentSummary) async throws {
         existingResult.summary = summary
         try modelContext.save()
     }

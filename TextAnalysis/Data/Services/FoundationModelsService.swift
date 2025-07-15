@@ -18,7 +18,7 @@ enum FoundationModelsError: Error {
 }
 
 protocol FoundationModelsServiceProtocol {
-    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary.PartiallyGenerated, Error>
+    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<DocumentSummary.PartiallyGenerated, Error>
     func quickAnalyze(_ content: String, fileType: FileType) async throws -> QuickAnalysis
     func extractEntities(_ content: String) async throws -> EntityExtraction
     func resetSession()
@@ -55,7 +55,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         print("Foundation Models session prewarming completed")
     }
     
-    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary.PartiallyGenerated, Error> {
+    func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<DocumentSummary.PartiallyGenerated, Error> {
         guard let session = session else {
             throw FoundationModelsError.sessionNotInitialized
         }
@@ -71,7 +71,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                 do {
                     let stream = session.streamResponse(
                         to: prompt,
-                        generating: StreamingDocumentSummary.self
+                        generating: DocumentSummary.self
                     )
                     
                     for try await summary in stream {
@@ -291,11 +291,11 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
     }
     
     
-    private func handleContextOverflow(_ content: String, fileType: FileType) async throws -> StreamingDocumentSummary {
+    private func handleContextOverflow(_ content: String, fileType: FileType) async throws -> DocumentSummary {
         // For context overflow, generate a basic summary from truncated content
         let estimatedMinutes = estimateTokenCount(content) / 200 // ~200 words per minute
         
-        return StreamingDocumentSummary(
+        return DocumentSummary(
             title: "Summary (Truncated)",
             overview: "This is a partial summary due to document length limitations.",
             keyPoints: ["Document was too long for full analysis", "Summary based on first portion of content"],

@@ -23,7 +23,7 @@ final class AnalysisResult {
         contentHash: String,
         fileName: String,
         fileType: FileType,
-        summary: StreamingDocumentSummary? = nil,
+        summary: DocumentSummary? = nil,
         quickAnalysis: QuickAnalysis? = nil,
         entities: EntityExtraction? = nil
     ) {
@@ -46,10 +46,10 @@ final class AnalysisResult {
         }
     }
     
-    var summary: StreamingDocumentSummary? {
+    var summary: DocumentSummary? {
         get {
             guard let data = summaryData else { return nil }
-            return try? JSONDecoder().decode(StreamingDocumentSummary.self, from: data)
+            return try? JSONDecoder().decode(DocumentSummary.self, from: data)
         }
         set {
             summaryData = try? JSONEncoder().encode(newValue)

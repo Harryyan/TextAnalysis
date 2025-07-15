@@ -9,7 +9,7 @@ import Foundation
 import FoundationModels
 
 @Generable
-struct StreamingDocumentSummary: Codable, Equatable {
+struct DocumentSummary: Codable, Equatable {
     let title: String
     let overview: String
     
