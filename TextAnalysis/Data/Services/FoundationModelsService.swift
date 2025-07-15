@@ -55,6 +55,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         print("Foundation Models session prewarming completed")
     }
     
+    @MainActor
     func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<DocumentSummary.PartiallyGenerated, Error> {
         guard let session = session else {
             throw FoundationModelsError.sessionNotInitialized
