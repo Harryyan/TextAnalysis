@@ -22,12 +22,14 @@ protocol FoundationModelsServiceProtocol {
     func quickAnalyze(_ content: String, fileType: FileType) async throws -> QuickAnalysis
     func extractEntities(_ content: String) async throws -> EntityExtraction
     func resetSession()
+    func prewarmSession() async throws
 }
 
 final class FoundationModelsService: FoundationModelsServiceProtocol {
     private var session: LanguageModelSession?
     private let maxContextTokens = 3500
     private let maxRetries = 3
+    private var isPrewarmed = false
     
     init() {
         initializeSession()
@@ -40,7 +42,17 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
     
     func resetSession() {
         session = nil
+        isPrewarmed = false
         initializeSession()
+    }
+    
+    func prewarmSession() async throws {
+        guard let session = session, !isPrewarmed else { return }
+        
+        print("Prewarming Foundation Models session for better performance...")
+        session.prewarm()
+        isPrewarmed = true
+        print("Foundation Models session prewarming completed")
     }
     
     func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<StreamingDocumentSummary.PartiallyGenerated, Error> {

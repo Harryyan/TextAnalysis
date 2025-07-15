@@ -11,13 +11,13 @@ import FoundationModels
 
 struct StreamingSummaryView: View {
     let document: FileDocument
+    let foundationService: FoundationModelsService
     @Environment(\.modelContext) private var modelContext
     @State private var currentSummary: StreamingDocumentSummary?
     @State private var partialSummary: StreamingDocumentSummary.PartiallyGenerated?
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0.0
-    @State private var foundationService = FoundationModelsService()
     @State private var analysisRepository: AnalysisRepository?
     @State private var contentHash: String = ""
     

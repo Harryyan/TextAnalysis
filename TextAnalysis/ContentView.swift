@@ -73,6 +73,7 @@ struct FileDetailView: View {
     let file: FileDocument
     @State private var showingSummary = false
     @State private var modelAvailability = ModelAvailabilityService()
+    @State private var foundationService = FoundationModelsService()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -111,6 +112,13 @@ struct FileDetailView: View {
                 // AI Summary button at bottom center (only if model is available)
                 if modelAvailability.isAvailable {
                     Button(action: {
+                        Task {
+                            do {
+                                try await foundationService.prewarmSession()
+                            } catch {
+                                print("Prewarming failed: \(error)")
+                            }
+                        }
                         showingSummary = true
                     }) {
                         HStack(spacing: 8) {
@@ -153,7 +161,7 @@ struct FileDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingSummary) {
             NavigationView {
-                StreamingSummaryView(document: file)
+                StreamingSummaryView(document: file, foundationService: foundationService)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button("Close") {
