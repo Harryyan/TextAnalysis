@@ -17,7 +17,7 @@ protocol AnalysisRepositoryProtocol {
     func deleteResult(for contentHash: String) async throws
 }
 
-final class AnalysisRepository: AnalysisRepositoryProtocol {
+struct AnalysisRepository: AnalysisRepositoryProtocol {
     private let modelContext: ModelContext
     
     init(modelContext: ModelContext) {

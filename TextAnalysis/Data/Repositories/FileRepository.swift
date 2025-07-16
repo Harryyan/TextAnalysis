@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-final class FileRepository: FileRepositoryProtocol {
+struct FileRepository: FileRepositoryProtocol {
     private let modelContext: ModelContext
     private let fileReaderService: FileReaderServiceProtocol
     

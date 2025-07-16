@@ -15,7 +15,9 @@ struct StreamingSummaryView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var currentSummary: DocumentSummary?
     @State private var partialSummary: DocumentSummary.PartiallyGenerated?
+    @State private var quickAnalysis: QuickAnalysis?
     @State private var isGenerating = false
+    @State private var isAnalyzing = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0.0
     @State private var analysisRepository: AnalysisRepository?
@@ -26,6 +28,9 @@ struct StreamingSummaryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerSection
+                    
+                    // Quick Analysis Section
+                    quickAnalysisSection
                     
                     if isGenerating {
                         streamingProgressSection
@@ -90,6 +95,40 @@ struct StreamingSummaryView: View {
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
+    }
+    
+    private var quickAnalysisSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let analysis = quickAnalysis {
+                QuickAnalysisView(analysis: analysis)
+            } else if isAnalyzing {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Performing quick analysis...")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            } else {
+                Button(action: performQuickAnalysis) {
+                    HStack {
+                        Image(systemName: "chart.bar.doc.horizontal")
+                        Text("Quick Analysis")
+                    }
+                    .font(.callout)
+                    .foregroundColor(.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(12)
+                }
+                .disabled(isGenerating || isAnalyzing)
+            }
+        }
     }
     
     private var generateButtonSection: some View {
@@ -294,6 +333,32 @@ struct StreamingSummaryView: View {
         }
     }
     
+    private func performQuickAnalysis() {
+        guard !isAnalyzing else { return }
+        
+        isAnalyzing = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let analysis = try await foundationService.quickAnalyze(document.content, fileType: document.fileType)
+                
+                await MainActor.run {
+                    quickAnalysis = analysis
+                    isAnalyzing = false
+                }
+                
+                // Cache the analysis
+                await cacheQuickAnalysis(analysis)
+            } catch {
+                await MainActor.run {
+                    errorMessage = handleError(error)
+                    isAnalyzing = false
+                }
+            }
+        }
+    }
+    
     private func setupRepository() {
         analysisRepository = AnalysisRepository(modelContext: modelContext)
         contentHash = AnalysisResult.generateContentHash(for: document.content)
@@ -303,10 +368,14 @@ struct StreamingSummaryView: View {
         guard let repository = analysisRepository else { return }
         
         Task {
-            if let cachedResult = await repository.getCachedResult(for: contentHash),
-               let cachedSummary = cachedResult.summary {
+            if let cachedResult = await repository.getCachedResult(for: contentHash) {
                 await MainActor.run {
-                    currentSummary = cachedSummary
+                    if let cachedSummary = cachedResult.summary {
+                        currentSummary = cachedSummary
+                    }
+                    if let cachedAnalysis = cachedResult.quickAnalysis {
+                        quickAnalysis = cachedAnalysis
+                    }
                 }
             }
         }
@@ -332,6 +401,25 @@ struct StreamingSummaryView: View {
         }
     }
     
+    private func cacheQuickAnalysis(_ analysis: QuickAnalysis) async {
+        guard let repository = analysisRepository else { return }
+        
+        do {
+            if let existingResult = await repository.getCachedResult(for: contentHash) {
+                try await repository.updateQuickAnalysis(for: contentHash, analysis: analysis)
+            } else {
+                let newResult = AnalysisResult(
+                    contentHash: contentHash,
+                    fileName: document.fileName,
+                    fileType: document.fileType,
+                    quickAnalysis: analysis
+                )
+                try await repository.saveAnalysisResult(newResult)
+            }
+        } catch {
+            print("Failed to cache quick analysis: \(error)")
+        }
+    }
     
     private func handleError(_ error: Error) -> String {
         // Handle Apple Foundation Models specific errors
