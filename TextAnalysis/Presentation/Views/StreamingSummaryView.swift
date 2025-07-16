@@ -20,7 +20,7 @@ struct StreamingSummaryView: View {
     @State private var isAnalyzing = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0.0
-    @State private var analysisRepository: AnalysisRepository?
+    @State private var analysisRepository: AnalysisRepositoryProtocol?
     @State private var contentHash: String = ""
     
     var body: some View {
@@ -406,7 +406,7 @@ struct StreamingSummaryView: View {
         
         do {
             if let existingResult = await repository.getCachedResult(for: contentHash) {
-                try await repository.updateQuickAnalysis(for: contentHash, analysis: analysis)
+                try await repository.updateQuickAnalysis(existingAnalysisResult: existingResult, analysis: analysis)
             } else {
                 let newResult = AnalysisResult(
                     contentHash: contentHash,

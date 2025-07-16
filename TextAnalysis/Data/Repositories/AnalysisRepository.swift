@@ -8,15 +8,6 @@
 import Foundation
 import SwiftData
 
-protocol AnalysisRepositoryProtocol {
-    func getCachedResult(for contentHash: String) async -> AnalysisResult?
-    func saveAnalysisResult(_ result: AnalysisResult) async throws
-    func updateQuickAnalysis(for contentHash: String, analysis: QuickAnalysis) async throws
-    func updateEntities(for contentHash: String, entities: EntityExtraction) async throws
-    func clearExpiredResults(maxAge: TimeInterval) async throws
-    func deleteResult(for contentHash: String) async throws
-}
-
 struct AnalysisRepository: AnalysisRepositoryProtocol {
     private let modelContext: ModelContext
     
@@ -50,21 +41,8 @@ struct AnalysisRepository: AnalysisRepositoryProtocol {
         try modelContext.save()
     }
     
-    func updateQuickAnalysis(for contentHash: String, analysis: QuickAnalysis) async throws {
-        guard let result = await getCachedResult(for: contentHash) else {
-            throw AnalysisRepositoryError.resultNotFound
-        }
-        
-        result.quickAnalysis = analysis
-        try modelContext.save()
-    }
-    
-    func updateEntities(for contentHash: String, entities: EntityExtraction) async throws {
-        guard let result = await getCachedResult(for: contentHash) else {
-            throw AnalysisRepositoryError.resultNotFound
-        }
-        
-        result.entities = entities
+    func updateQuickAnalysis(existingAnalysisResult: AnalysisResult, analysis: QuickAnalysis) async throws {
+        existingAnalysisResult.quickAnalysis = analysis
         try modelContext.save()
     }
     
