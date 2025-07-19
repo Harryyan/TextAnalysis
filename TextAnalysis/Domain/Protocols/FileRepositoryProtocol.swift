@@ -8,8 +8,8 @@
 import Foundation
 
 protocol FileRepositoryProtocol {
-    func loadResourceFiles() async -> [FileDocument]
-    func getAllFiles() async -> [FileDocument]
-    func saveFile(_ file: FileDocument) async throws
-    func deleteFile(_ file: FileDocument) async throws
+    func loadResourceFiles() async -> Result<[FileDocument], FileError>
+    func getAllFiles() async -> Result<[FileDocument], FileError>
+    func saveFile(_ file: FileDocument) async -> Result<Void, FileError>
+    func deleteFile(_ file: FileDocument) async -> Result<Void, FileError>
 }

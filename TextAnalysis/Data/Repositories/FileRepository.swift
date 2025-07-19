@@ -17,15 +17,19 @@ struct FileRepository: FileRepositoryProtocol {
         self.fileReaderService = fileReaderService
     }
     
-    func loadResourceFiles() async -> [FileDocument] {
-        return await fileReaderService.loadResourceFiles()
+    func loadResourceFiles() async -> Result<[FileDocument], FileError> {
+        let documents = await fileReaderService.loadResourceFiles()
+        if documents.isEmpty {
+            return .failure(.resourceLoadingFailed(reason: "No resource files found"))
+        }
+        return .success(documents)
     }
     
-    func getAllFiles() async -> [FileDocument] {
+    func getAllFiles() async -> Result<[FileDocument], FileError> {
         let descriptor = FetchDescriptor<Item>()
         do {
             let items = try modelContext.fetch(descriptor)
-            return items.map { item in
+            let documents = items.map { item in
                 FileDocument(
                     fileName: item.fileName,
                     fileType: item.fileTypeEnum,
@@ -34,25 +38,30 @@ struct FileRepository: FileRepositoryProtocol {
                     timestamp: item.timestamp
                 )
             }
+            return .success(documents)
         } catch {
-            print("Error fetching files: \(error)")
-            return []
+            return .failure(.storageError(reason: "Failed to fetch files: \(error.localizedDescription)"))
         }
     }
     
-    func saveFile(_ file: FileDocument) async throws {
-        let item = Item(
-            timestamp: file.timestamp,
-            fileName: file.fileName,
-            fileType: file.fileType,
-            content: file.content,
-            fileURL: file.url
-        )
-        modelContext.insert(item)
-        try modelContext.save()
+    func saveFile(_ file: FileDocument) async -> Result<Void, FileError> {
+        do {
+            let item = Item(
+                timestamp: file.timestamp,
+                fileName: file.fileName,
+                fileType: file.fileType,
+                content: file.content,
+                fileURL: file.url
+            )
+            modelContext.insert(item)
+            try modelContext.save()
+            return .success(())
+        } catch {
+            return .failure(.fileWritingFailed(fileName: file.fileName, reason: error.localizedDescription))
+        }
     }
     
-    func deleteFile(_ file: FileDocument) async throws {
+    func deleteFile(_ file: FileDocument) async -> Result<Void, FileError> {
         let fileName = file.fileName
         let descriptor = FetchDescriptor<Item>(
             predicate: #Predicate { $0.fileName == fileName }
@@ -60,12 +69,16 @@ struct FileRepository: FileRepositoryProtocol {
         
         do {
             let items = try modelContext.fetch(descriptor)
+            if items.isEmpty {
+                return .failure(.fileNotFound(fileName: fileName))
+            }
             for item in items {
                 modelContext.delete(item)
             }
             try modelContext.save()
+            return .success(())
         } catch {
-            throw error
+            return .failure(.fileDeletionFailed(fileName: fileName, reason: error.localizedDescription))
         }
     }
 }

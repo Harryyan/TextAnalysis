@@ -21,4 +21,15 @@ final class DIContainer {
         
         return FileListViewModel(loadFilesUseCase: loadFilesUseCase)
     }
+    
+    func makeStreamingSummaryViewModel(document: FileDocument, foundationService: FoundationModelsService, modelContext: ModelContext) -> StreamingSummaryViewModel {
+        let analysisRepository = AnalysisRepository(modelContext: modelContext)
+        let documentAnalysisUseCase = DocumentAnalysisUseCase(analysisRepository: analysisRepository)
+        
+        return StreamingSummaryViewModel(
+            document: document,
+            foundationService: foundationService,
+            documentAnalysisUseCase: documentAnalysisUseCase
+        )
+    }
 }

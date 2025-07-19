@@ -25,37 +25,58 @@ import SwiftUI
         isLoading = true
         errorMessage = nil
         
-        files = await loadFilesUseCase.getAllFiles()
-        
-        // If no files exist, automatically load resource files
-        if files.isEmpty {
-            await loadResourceFilesAutomatically()
+        let result = await loadFilesUseCase.getAllFiles()
+        switch result {
+        case .success(let documents):
+            files = documents
+            // If no files exist, automatically load resource files
+            if files.isEmpty {
+                await loadResourceFilesAutomatically()
+            }
+        case .failure(let error):
+            errorMessage = error.userFriendlyMessage
+            files = []
         }
         
         isLoading = false
     }
     
     private func loadResourceFilesAutomatically() async {
-        do {
-            let resourceFiles = await loadFilesUseCase.loadResourceFiles()
-            
+        let resourceResult = await loadFilesUseCase.loadResourceFiles()
+        switch resourceResult {
+        case .success(let resourceFiles):
+            var hasErrors = false
             for file in resourceFiles {
-                try await loadFilesUseCase.saveFile(file)
+                let saveResult = await loadFilesUseCase.saveFile(file)
+                if case .failure(let error) = saveResult {
+                    errorMessage = error.userFriendlyMessage
+                    hasErrors = true
+                    break
+                }
             }
             
-            // Reload files after adding resource files
-            files = await loadFilesUseCase.getAllFiles()
-        } catch {
-            errorMessage = "Failed to load resource files: \(error.localizedDescription)"
+            if !hasErrors {
+                // Reload files after adding resource files
+                let reloadResult = await loadFilesUseCase.getAllFiles()
+                switch reloadResult {
+                case .success(let documents):
+                    files = documents
+                case .failure(let error):
+                    errorMessage = error.userFriendlyMessage
+                }
+            }
+        case .failure(let error):
+            errorMessage = error.userFriendlyMessage
         }
     }
     
     func deleteFile(_ file: FileDocument) async {
-        do {
-            try await loadFilesUseCase.deleteFile(file)
+        let result = await loadFilesUseCase.deleteFile(file)
+        switch result {
+        case .success:
             await loadFiles()
-        } catch {
-            errorMessage = "Failed to delete file: \(error.localizedDescription)"
+        case .failure(let error):
+            errorMessage = error.userFriendlyMessage
         }
     }
     

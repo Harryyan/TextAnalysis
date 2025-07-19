@@ -8,10 +8,10 @@
 import Foundation
 
 protocol LoadFilesUseCaseProtocol {
-    func loadResourceFiles() async -> [FileDocument]
-    func getAllFiles() async -> [FileDocument]
-    func deleteFile(_ file: FileDocument) async throws
-    func saveFile(_ file: FileDocument) async throws
+    func loadResourceFiles() async -> Result<[FileDocument], FileError>
+    func getAllFiles() async -> Result<[FileDocument], FileError>
+    func deleteFile(_ file: FileDocument) async -> Result<Void, FileError>
+    func saveFile(_ file: FileDocument) async -> Result<Void, FileError>
 }
 
 final class LoadFilesUseCase: LoadFilesUseCaseProtocol {
@@ -21,19 +21,19 @@ final class LoadFilesUseCase: LoadFilesUseCaseProtocol {
         self.fileRepository = fileRepository
     }
     
-    func loadResourceFiles() async -> [FileDocument] {
+    func loadResourceFiles() async -> Result<[FileDocument], FileError> {
         return await fileRepository.loadResourceFiles()
     }
     
-    func getAllFiles() async -> [FileDocument] {
+    func getAllFiles() async -> Result<[FileDocument], FileError> {
         return await fileRepository.getAllFiles()
     }
     
-    func deleteFile(_ file: FileDocument) async throws {
-        try await fileRepository.deleteFile(file)
+    func deleteFile(_ file: FileDocument) async -> Result<Void, FileError> {
+        return await fileRepository.deleteFile(file)
     }
     
-    func saveFile(_ file: FileDocument) async throws {
-        try await fileRepository.saveFile(file)
+    func saveFile(_ file: FileDocument) async -> Result<Void, FileError> {
+        return await fileRepository.saveFile(file)
     }
 }

@@ -19,7 +19,7 @@ import FoundationModels
     var errorMessage: String?
     var generationProgress: Double = 0.0
     
-    private var analysisRepository: AnalysisRepositoryProtocol?
+    private let documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol
     private var contentHash: String = ""
     private let foundationService: FoundationModelsService
     private let document: FileDocument
@@ -27,12 +27,14 @@ import FoundationModels
     // Comprehensive task tracking for cancellation
     private var generationTask: Task<Void, Never>?
     private var analysisTask: Task<Void, Never>?
-    private var loadingTask: Task<Void, Never>?
+    private var loadingTask: Task<Void, Error>?
     private var cachingTask: Task<Void, Never>?
     
-    init(document: FileDocument, foundationService: FoundationModelsService) {
+    init(document: FileDocument, foundationService: FoundationModelsService, documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol) {
         self.document = document
         self.foundationService = foundationService
+        self.documentAnalysisUseCase = documentAnalysisUseCase
+        self.contentHash = AnalysisResult.generateContentHash(for: document.content)
     }
     
     func cancelAllTasks() {
@@ -51,41 +53,34 @@ import FoundationModels
         isAnalyzing = false
     }
     
-    func setupRepository(modelContext: ModelContext) {
-        analysisRepository = AnalysisRepository(modelContext: modelContext)
-        contentHash = AnalysisResult.generateContentHash(for: document.content)
-    }
-    
     func loadCachedData() {
-        guard let repository = analysisRepository else { return }
-        
-        // Cancel any existing loading task
         loadingTask?.cancel()
-        
         loadingTask = Task {
             do {
-                if let cachedResult = await repository.getCachedResult(for: contentHash) {
-                    // Check for cancellation before updating UI
-                    try Task.checkCancellation()
-                    
-                    await MainActor.run {
-                        if let cachedSummary = cachedResult.summary {
-                            currentSummary = cachedSummary
+                let result = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+                
+                // Check for cancellation before updating UI
+                try Task.checkCancellation()
+                
+                await MainActor.run {
+                    switch result {
+                    case .success(let cachedResult):
+                        if let cachedResult = cachedResult {
+                            if let cachedSummary = cachedResult.summary {
+                                currentSummary = cachedSummary
+                            }
+                            if let cachedAnalysis = cachedResult.quickAnalysis {
+                                quickAnalysis = cachedAnalysis
+                            }
                         }
-                        if let cachedAnalysis = cachedResult.quickAnalysis {
-                            quickAnalysis = cachedAnalysis
-                        }
-                        loadingTask = nil
+                    case .failure(let error):
+                        errorMessage = error.userFriendlyMessage
                     }
+                    loadingTask = nil
                 }
             } catch is CancellationError {
                 await MainActor.run {
                     loadingTask = nil
-                }
-            } catch {
-                await MainActor.run {
-                    loadingTask = nil
-                    print("Failed to load cached data: \(error)")
                 }
             }
         }
@@ -233,56 +228,76 @@ import FoundationModels
     }
     
     private func cacheSummary(_ summary: DocumentSummary) async {
-        guard let repository = analysisRepository else { return }
+        // Check for cancellation before database operations
+        guard !Task.isCancelled else { return }
         
-        do {
-            // Check for cancellation before database operations
-            try Task.checkCancellation()
-            
-            if let existingResult = await repository.getCachedResult(for: contentHash) {
-                try Task.checkCancellation()
-                try await repository.updateSummary(existingResult: existingResult, summary: summary)
+        let cachedResult = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+        
+        switch cachedResult {
+        case .success(let existingResult):
+            if let existingResult = existingResult {
+                guard !Task.isCancelled else { return }
+                let updateResult = await documentAnalysisUseCase.updateExistingSummary(existingResult: existingResult, summary: summary)
+                if case .failure(let error) = updateResult {
+                    await MainActor.run {
+                        errorMessage = error.userFriendlyMessage
+                    }
+                }
             } else {
-                let newResult = AnalysisResult(
+                guard !Task.isCancelled else { return }
+                let saveResult = await documentAnalysisUseCase.saveDocumentSummary(
                     contentHash: contentHash,
                     fileName: document.fileName,
                     fileType: document.fileType,
                     summary: summary
                 )
-                try Task.checkCancellation()
-                try await repository.saveAnalysisResult(newResult)
+                if case .failure(let error) = saveResult {
+                    await MainActor.run {
+                        errorMessage = error.userFriendlyMessage
+                    }
+                }
             }
-        } catch is CancellationError {
-            // Silently handle cancellation
-        } catch {
-            print("Failed to cache summary: \(error)")
+        case .failure(let error):
+            await MainActor.run {
+                errorMessage = error.userFriendlyMessage
+            }
         }
     }
     
     private func cacheQuickAnalysis(_ analysis: QuickAnalysis) async {
-        guard let repository = analysisRepository else { return }
+        // Check for cancellation before database operations
+        guard !Task.isCancelled else { return }
         
-        do {
-            // Check for cancellation before database operations
-            try Task.checkCancellation()
-            
-            if let existingResult = await repository.getCachedResult(for: contentHash) {
-                try Task.checkCancellation()
-                try await repository.updateQuickAnalysis(existingAnalysisResult: existingResult, analysis: analysis)
+        let cachedResult = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+        
+        switch cachedResult {
+        case .success(let existingResult):
+            if let existingResult = existingResult {
+                guard !Task.isCancelled else { return }
+                let updateResult = await documentAnalysisUseCase.updateExistingQuickAnalysis(existingResult: existingResult, analysis: analysis)
+                if case .failure(let error) = updateResult {
+                    await MainActor.run {
+                        errorMessage = error.userFriendlyMessage
+                    }
+                }
             } else {
-                let newResult = AnalysisResult(
+                guard !Task.isCancelled else { return }
+                let saveResult = await documentAnalysisUseCase.saveQuickAnalysis(
                     contentHash: contentHash,
                     fileName: document.fileName,
                     fileType: document.fileType,
-                    quickAnalysis: analysis
+                    analysis: analysis
                 )
-                try Task.checkCancellation()
-                try await repository.saveAnalysisResult(newResult)
+                if case .failure(let error) = saveResult {
+                    await MainActor.run {
+                        errorMessage = error.userFriendlyMessage
+                    }
+                }
             }
-        } catch is CancellationError {
-            // Silently handle cancellation
-        } catch {
-            print("Failed to cache quick analysis: \(error)")
+        case .failure(let error):
+            await MainActor.run {
+                errorMessage = error.userFriendlyMessage
+            }
         }
     }
     

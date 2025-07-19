@@ -19,7 +19,12 @@ struct StreamingSummaryView: View {
     init(document: FileDocument, foundationService: FoundationModelsService) {
         self.document = document
         self.foundationService = foundationService
-        self._viewModel = State(wrappedValue: StreamingSummaryViewModel(document: document, foundationService: foundationService))
+        // Temporary placeholder - will be replaced in onAppear
+        self._viewModel = State(wrappedValue: StreamingSummaryViewModel(
+            document: document,
+            foundationService: foundationService,
+            documentAnalysisUseCase: DocumentAnalysisUseCase(analysisRepository: AnalysisRepository(modelContext: try! ModelContainer(for: Item.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)).mainContext))
+        ))
     }
     
     var body: some View {
@@ -68,7 +73,12 @@ struct StreamingSummaryView: View {
         .navigationTitle("AI Summary")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            viewModel.setupRepository(modelContext: modelContext)
+            // Replace the placeholder ViewModel with properly injected one
+            viewModel = DIContainer.shared.makeStreamingSummaryViewModel(
+                document: document,
+                foundationService: foundationService,
+                modelContext: modelContext
+            )
             viewModel.loadCachedData()
         }
         .onDisappear {
