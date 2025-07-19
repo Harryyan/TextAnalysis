@@ -1,23 +1,30 @@
 import SwiftUI
 
 struct FileDetailView: View {
-    let file: FileDocument
-    @State private var showingSummary = false
-    @State private var modelAvailability = ModelAvailabilityService()
-    @State private var foundationService = FoundationModelsService()
+    @State private var viewModel: FileDetailViewModel
+    
+    init(file: FileDocument) {
+        let foundationService = FoundationModelsService()
+        let modelAvailability = ModelAvailabilityService()
+        self._viewModel = State(wrappedValue: FileDetailViewModel(
+            file: file,
+            foundationService: foundationService,
+            modelAvailability: modelAvailability
+        ))
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header with file info
             VStack(alignment: .leading, spacing: 8) {
-                Text(file.fileName)
+                Text(viewModel.fileName)
                     .font(.title2)
                     .bold()
                 
                 HStack {
-                    Text("Type: \(file.fileType.displayName)")
+                    Text("Type: \(viewModel.fileTypeDisplayName)")
                     Spacer()
-                    Text("Loaded: \(file.timestamp, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
+                    Text("Loaded: \(viewModel.fileTimestamp, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -27,12 +34,12 @@ struct FileDetailView: View {
             
             // Content based on file type
             ZStack(alignment: .bottom) {
-                if file.fileType == .pdf, let url = file.url {
+                if viewModel.isPDFFile, let url = viewModel.fileURL {
                     PDFViewWrapper(url: url)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        Text(file.content)
+                        Text(viewModel.fileContent)
                             .font(.body)
                             .textSelection(.enabled)
                             .padding()
@@ -41,16 +48,9 @@ struct FileDetailView: View {
                 }
                 
                 // AI Summary button at bottom center (only if model is available)
-                if modelAvailability.isAvailable {
+                if viewModel.isModelAvailable {
                     Button(action: {
-                        Task {
-                            do {
-                                try await foundationService.prewarmSession()
-                            } catch {
-                                print("Prewarming failed: \(error)")
-                            }
-                        }
-                        showingSummary = true
+                        viewModel.prewarmAndShowSummary()
                     }) {
                         HStack(spacing: 8) {
                             Image(systemName: "sparkles")
@@ -64,7 +64,7 @@ struct FileDetailView: View {
                         .cornerRadius(10)
                     }
                     .padding(.bottom, 20)
-                } else if let reason = modelAvailability.getUnavailabilityReason() {
+                } else if let reason = viewModel.unavailabilityReason {
                     // Show unavailability message
                     VStack(spacing: 8) {
                         Image(systemName: "apple.intelligence.badge.xmark")
@@ -90,13 +90,13 @@ struct FileDetailView: View {
         }
         .navigationTitle("File Content")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingSummary) {
+        .sheet(isPresented: $viewModel.showingSummary) {
             NavigationView {
-                StreamingSummaryView(document: file, foundationService: foundationService)
+                StreamingSummaryView(document: viewModel.documentForSummary, foundationService: viewModel.foundationServiceForSummary)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button("Close") {
-                                showingSummary = false
+                                viewModel.showingSummary = false
                             }
                         }
                     }

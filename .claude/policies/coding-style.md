@@ -8,7 +8,7 @@
 - **Type naming**: All type names (class, struct, enum, protocol) must use `UpperCamelCase`.  
   Acronyms must be capitalized consistently (e.g. `URLSession`, not `UrlSession`).
 
-- **Force unwrapping is not allowed** (using `!`).  
+- **Force unwrapping is not allowed** .  
   Claude should default to `guard let` or `if let`, unless explicitly told otherwise.
 
 - **Access control**: Default to `private(set)` for mutable properties.  
@@ -56,6 +56,7 @@
 - **Do not launch Task blocks or embed async logic inside SwiftUI Views.**  
   Async workflows must be implemented as methods inside the ViewModel.  
   Views may invoke those methods directly, but may not construct or manage `Task` objects themselves.
+  **This includes private methods in Views** - NO Task blocks anywhere in View code.
 
   Recommended (ViewModel handles Task internally):
 
@@ -73,15 +74,92 @@
   Button("Load") {
       viewModel.loadData()
   }
+  ```
 
-Not recommended:
+  Not recommended:
 
-    // View (bad practice)
-    Button("Load") {
-        Task {
-            viewModel.data = await repository.fetch()
-        }
-    }
+  ```swift
+  // View (bad practice)
+  Button("Load") {
+      Task {
+          viewModel.data = await repository.fetch()
+      }
+  }
+
+  // View with private method (ALSO bad practice)
+  private func loadData() {
+      Task {
+          // Any Task block in View code is forbidden
+      }
+  }
+  ```
+
+- **Views must NOT directly manage services or domain entities.**  
+  Services (like `FoundationModelsService`, `ModelAvailabilityService`) and domain entities (like `FileDocument`) must be managed by ViewModels.
+  Views should only access data through ViewModel computed properties.
+
+  Recommended:
+  ```swift
+  // ViewModel
+  @Observable final class FileDetailViewModel {
+      private let file: FileDocument
+      private let foundationService: FoundationModelsService
+      
+      var fileName: String { file.fileName }
+      var fileContent: String { file.content }
+  }
+
+  // View
+  struct FileDetailView: View {
+      @State private var viewModel: FileDetailViewModel
+      
+      var body: some View {
+          Text(viewModel.fileName) // Access through ViewModel
+      }
+  }
+  ```
+
+  Not recommended:
+  ```swift
+  // View (bad practice)
+  struct FileDetailView: View {
+      let file: FileDocument // Direct entity access
+      @State private var foundationService = FoundationModelsService() // Direct service management
+  }
+  ```
+
+- **Proper ViewModel Construction and Dependency Injection.**  
+  ViewModels must receive all dependencies through their initializer. Views must construct ViewModels in their init method.
+
+  Recommended:
+  ```swift
+  // View
+  struct FileDetailView: View {
+      @State private var viewModel: FileDetailViewModel
+      
+      init(file: FileDocument) {
+          let foundationService = FoundationModelsService()
+          let modelAvailability = ModelAvailabilityService()
+          self._viewModel = State(wrappedValue: FileDetailViewModel(
+              file: file,
+              foundationService: foundationService,
+              modelAvailability: modelAvailability
+          ))
+      }
+  }
+  ```
+
+  Not recommended:
+  ```swift
+  // View (bad practice)
+  struct FileDetailView: View {
+      @State private var viewModel = FileDetailViewModel() // No dependency injection
+      
+      var body: some View {
+          // View then has to pass data to ViewModel later
+      }
+  }
+  ```
 
 - **Avoid structural conditionals (`if`, `switch`) that change view hierarchy.**  
   Prefer `.opacity()`, `.hidden()`, `.overlay()` (or similar modifiers) to toggle visibility while keeping a stable structure.
@@ -115,12 +193,21 @@ Not recommended:
 
 ---
 
-### 6. Feedback Requirements
+### 6. Enforcement and Feedback Requirements
 
 Claude must self-check compliance with this policy **before** proposing or committing changes.
 
-If any rule is violated in generated or modified code, Claude must:
+**Critical Violations (Must be fixed immediately):**
+- Task blocks anywhere in SwiftUI View code (including private methods)
+- Services or domain entities directly managed by Views
+- Force unwrapping (use safe unwrapping patterns)
+- Using `@ObservableObject` instead of `@Observable`
 
+**When violations are found, Claude must:**
 1. Clearly explain **which rule** was broken (reference the section).  
-2. Provide or apply a concrete fix (diff or corrected snippet) **before** marking the work complete.  
+2. Provide or apply a concrete fix (diff or corrected snippet) **before** marking the work complete.
+3. **Remember these patterns** for future code generation to avoid repeating the same mistakes.
+
+**Policy Updates:**
+This policy should be updated whenever new best practices are discovered through code reviews or refactoring sessions. The goal is continuous improvement of code quality and architectural consistency.  
 

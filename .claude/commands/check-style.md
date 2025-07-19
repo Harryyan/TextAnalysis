@@ -7,7 +7,7 @@ You are a Swift coding style checker. Your task is to analyze the codebase again
 1. **Read the coding style policy** from `.claude/policies/coding-style.md` to understand all rules
 2. **Search for Swift files** using Glob tool with pattern `**/*.swift`
 3. **Check each Swift file** for violations:
-   - Force unwrapping (using `!`) - should use `guard let` or `if let`
+   - Force unwrapping - should use `guard let` or `if let`
    - `@ObservableObject` or `@Published` usage - should use `@Observable` macro
    - snake_case variables - should use lowerCamelCase
    - Non-final classes - should be `final class` unless inheritance needed
@@ -25,11 +25,11 @@ You are a Swift coding style checker. Your task is to analyze the codebase again
    ### ❌ Files with Violations:
    
    **File3.swift:**
-   - Line 25: Force unwrapping found: `user.name!`
+   - Line 25: Force unwrapping found: <place info>
    - Line 42: Using @ObservableObject instead of @Observable
    
    **File4.swift:**
-   - Line 15: snake_case variable: `user_name`
+   - Line 15: snake_case variable: user_name
    ```
 
 5. **If violations found**, ask: "Would you like me to fix these violations automatically?"

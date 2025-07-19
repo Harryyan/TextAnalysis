@@ -28,9 +28,7 @@ struct ContentView: View {
                     }
                 }
                 .onDelete { offsets in
-                    Task {
-                        await viewModel.deleteFiles(at: offsets)
-                    }
+                    viewModel.deleteFiles(at: offsets)
                 }
             }
             .navigationTitle("Files")
@@ -71,9 +69,11 @@ struct ContentView: View {
 
 #Preview {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Item.self, configurations: configuration)
+    guard let container = try? ModelContainer(for: Item.self, configurations: configuration) else {
+        return Text("Preview unavailable")
+    }
     let viewModel = DIContainer.shared.makeFileListViewModel(modelContext: container.mainContext)
     
-    ContentView(viewModel: viewModel)
+    return ContentView(viewModel: viewModel)
         .modelContainer(container)
 }

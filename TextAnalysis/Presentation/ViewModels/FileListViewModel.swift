@@ -80,10 +80,12 @@ import SwiftUI
         }
     }
     
-    func deleteFiles(at offsets: IndexSet) async {
-        for index in offsets {
-            let file = files[index]
-            await deleteFile(file)
+    func deleteFiles(at offsets: IndexSet) {
+        Task {
+            for index in offsets {
+                let file = files[index]
+                await deleteFile(file)
+            }
         }
     }
 }

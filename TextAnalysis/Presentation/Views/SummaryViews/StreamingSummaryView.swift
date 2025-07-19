@@ -20,10 +20,26 @@ struct StreamingSummaryView: View {
         self.document = document
         self.foundationService = foundationService
         // Temporary placeholder - will be replaced in onAppear
+        let tempModelContext: ModelContext
+        do {
+            let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+            let container = try ModelContainer(for: Item.self, configurations: configuration)
+            tempModelContext = container.mainContext
+        } catch {
+            // Fallback to a default configuration
+            do {
+                let fallbackContainer = try ModelContainer(for: Item.self)
+                tempModelContext = fallbackContainer.mainContext
+            } catch {
+                // This should never happen in practice, but provides a safe fallback
+                fatalError("Unable to create ModelContainer: \(error)")
+            }
+        }
+        
         self._viewModel = State(wrappedValue: StreamingSummaryViewModel(
             document: document,
             foundationService: foundationService,
-            documentAnalysisUseCase: DocumentAnalysisUseCase(analysisRepository: AnalysisRepository(modelContext: try! ModelContainer(for: Item.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)).mainContext))
+            documentAnalysisUseCase: DocumentAnalysisUseCase(analysisRepository: AnalysisRepository(modelContext: tempModelContext))
         ))
     }
     
