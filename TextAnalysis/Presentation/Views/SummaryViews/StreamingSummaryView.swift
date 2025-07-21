@@ -11,94 +11,74 @@ import FoundationModels
 
 struct StreamingSummaryView: View {
     let document: FileDocument
-    let foundationService: FoundationModelsService
     
     @Environment(\.modelContext) private var modelContext
-    @State private var viewModel: StreamingSummaryViewModel
-    
-    init(document: FileDocument, foundationService: FoundationModelsService) {
-        self.document = document
-        self.foundationService = foundationService
-        // Temporary placeholder - will be replaced in onAppear
-        let tempModelContext: ModelContext
-        do {
-            let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
-            let container = try ModelContainer(for: Item.self, configurations: configuration)
-            tempModelContext = container.mainContext
-        } catch {
-            // Fallback to a default configuration
-            do {
-                let fallbackContainer = try ModelContainer(for: Item.self)
-                tempModelContext = fallbackContainer.mainContext
-            } catch {
-                // This should never happen in practice, but provides a safe fallback
-                fatalError("Unable to create ModelContainer: \(error)")
-            }
-        }
-        
-        self._viewModel = State(wrappedValue: StreamingSummaryViewModel(
-            document: document,
-            foundationService: foundationService,
-            documentAnalysisUseCase: DocumentAnalysisUseCase(analysisRepository: AnalysisRepository(modelContext: tempModelContext))
-        ))
-    }
+    @EnvironmentObject var diContainer: DIContainer
+    @State private var viewModel: StreamingSummaryViewModel?
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    headerSection
-                    
-                    // Quick Analysis Section
-                    quickAnalysisSection
-                    
-                    if viewModel.isGenerating {
-                        streamingProgressSection
-                    } else if let summary = viewModel.currentSummary {
-                        summaryDisplaySection(summary)
-                            .id("completedSummary") // Add ID for scroll targeting
-                    } else {
-                        generateButtonSection
-                    }
-                    
-                    if let error = viewModel.errorMessage {
-                        errorSection(error)
-                    }
-                }
-                .padding()
-                .onChange(of: viewModel.partialSummary) { _, newPartial in
-                    // Auto-scroll when new content is generated
-                    if newPartial != nil && viewModel.isGenerating {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            proxy.scrollTo("streamingContent", anchor: .bottom)
+        Group {
+            if let viewModel = viewModel {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            headerSection
+                            
+                            // Quick Analysis Section
+                            quickAnalysisSection(viewModel)
+                            
+                            if viewModel.isGenerating {
+                                streamingProgressSection(viewModel)
+                            } else if let summary = viewModel.currentSummary {
+                                summaryDisplaySection(summary, viewModel)
+                                    .id("completedSummary") // Add ID for scroll targeting
+                            } else {
+                                generateButtonSection(viewModel)
+                            }
+                            
+                            if let error = viewModel.errorMessage {
+                                errorSection(error)
+                            }
                         }
-                    }
-                }
-                .onChange(of: viewModel.isGenerating) { _, generating in
-                    // Auto-scroll when generation completes
-                    if !generating && viewModel.currentSummary != nil {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                proxy.scrollTo("completedSummary", anchor: .bottom)
+                        .padding()
+                        .onChange(of: viewModel.partialSummary) { _, newPartial in
+                            // Auto-scroll when new content is generated
+                            if newPartial != nil && viewModel.isGenerating {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    proxy.scrollTo("streamingContent", anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: viewModel.isGenerating) { _, generating in
+                            // Auto-scroll when generation completes
+                            if !generating && viewModel.currentSummary != nil {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation(.easeInOut(duration: 0.5)) {
+                                        proxy.scrollTo("completedSummary", anchor: .bottom)
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                .onDisappear {
+                    viewModel.cancelAllTasks()
+                }
+            } else {
+                ProgressView("Initializing...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .navigationTitle("AI Summary")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            // Replace the placeholder ViewModel with properly injected one
-            viewModel = DIContainer.shared.makeStreamingSummaryViewModel(
-                document: document,
-                foundationService: foundationService,
-                modelContext: modelContext
-            )
-            viewModel.loadCachedData()
-        }
-        .onDisappear {
-            viewModel.cancelAllTasks()
+        .task {
+            if viewModel == nil {
+                viewModel = diContainer.makeStreamingSummaryViewModel(
+                    document: document,
+                    modelContext: modelContext
+                )
+                viewModel?.loadCachedData()
+            }
         }
     }
     
@@ -125,7 +105,7 @@ struct StreamingSummaryView: View {
         .cornerRadius(12)
     }
     
-    private var quickAnalysisSection: some View {
+    private func quickAnalysisSection(_ viewModel: StreamingSummaryViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let analysis = viewModel.quickAnalysis {
                 QuickAnalysisView(analysis: analysis)
@@ -159,7 +139,7 @@ struct StreamingSummaryView: View {
         }
     }
     
-    private var generateButtonSection: some View {
+    private func generateButtonSection(_ viewModel: StreamingSummaryViewModel) -> some View {
         VStack(spacing: 12) {
             Button(action: viewModel.startStreamingGeneration) {
                 HStack {
@@ -189,7 +169,7 @@ struct StreamingSummaryView: View {
         }
     }
     
-    private var streamingProgressSection: some View {
+    private func streamingProgressSection(_ viewModel: StreamingSummaryViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 ProgressView()
@@ -212,7 +192,7 @@ struct StreamingSummaryView: View {
         .cornerRadius(12)
     }
     
-    private func summaryDisplaySection(_ summary: DocumentSummary) -> some View {
+    private func summaryDisplaySection(_ summary: DocumentSummary, _ viewModel: StreamingSummaryViewModel) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             // Title
             VStack(alignment: .leading, spacing: 8) {

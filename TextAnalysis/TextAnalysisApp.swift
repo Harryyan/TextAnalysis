@@ -23,6 +23,7 @@ struct TextAnalysisApp: App {
     var body: some Scene {
         WindowGroup {
             ContentViewWrapper()
+                .environmentObject(DIContainer.shared)
         }
         .modelContainer(sharedModelContainer)
     }
@@ -30,8 +31,9 @@ struct TextAnalysisApp: App {
 
 struct ContentViewWrapper: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var diContainer: DIContainer
     
     var body: some View {
-        ContentView(viewModel: DIContainer.shared.makeFileListViewModel(modelContext: modelContext))
+        ContentView(viewModel: diContainer.makeFileListViewModel(modelContext: modelContext))
     }
 }
