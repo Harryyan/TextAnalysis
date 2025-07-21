@@ -72,7 +72,8 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                 do {
                     let stream = session.streamResponse(
                         to: prompt,
-                        generating: DocumentSummary.self
+                        generating: DocumentSummary.self,
+                        options: GenerationOptions(temperature: 2.0)
                     )
                     
                     for try await summary in stream {
@@ -112,7 +113,8 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         do {
             let response = try await session.respond(
                 to: prompt,
-                generating: QuickAnalysis.self
+                generating: QuickAnalysis.self,
+                options: GenerationOptions(temperature: 2.0)
             )
             return response.content
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {

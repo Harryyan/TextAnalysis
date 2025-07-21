@@ -21,8 +21,9 @@
   Claude must treat `final class` as the default.
 
 - **Do not use `@ObservableObject` or `@Published`.**  
-  Use Swift’s modern `@Observable` macro instead.  
+  Use Swift's modern `@Observable` macro instead.  
   Claude must refactor any usage of `ObservableObject` to `@Observable`.
+  **Exception**: `@EnvironmentObject` and `ObservableObject` are allowed when used together for dependency injection patterns (e.g., DIContainer).
 
 ## 2. File-Level Rules
 
@@ -52,11 +53,13 @@
 - **Use `@Observable` macro for ViewModel state**.  
   Views must hold the ViewModel using `@State var viewModel: ViewModel`.  
   Claude must not use `@ObservedObject`, `@StateObject`, or `@EnvironmentObject`.
+  **Exception**: `@EnvironmentObject` is allowed for dependency injection containers (e.g., DIContainer).
 
 - **Do not launch Task blocks or embed async logic inside SwiftUI Views.**  
   Async workflows must be implemented as methods inside the ViewModel.  
   Views may invoke those methods directly, but may not construct or manage `Task` objects themselves.
   **This includes private methods in Views** - NO Task blocks anywhere in View code.
+  **Exception**: SwiftUI view modifiers like `.task {}`, `.onAppear { Task { } }`, `.refreshable {}` are allowed as they are part of SwiftUI's declarative lifecycle.
 
   Recommended (ViewModel handles Task internally):
 
@@ -198,10 +201,10 @@
 Claude must self-check compliance with this policy **before** proposing or committing changes.
 
 **Critical Violations (Must be fixed immediately):**
-- Task blocks anywhere in SwiftUI View code (including private methods)
+- Manual Task blocks in SwiftUI View code (excluding SwiftUI view modifiers like `.task {}`, `.onAppear { Task { } }`)
 - Services or domain entities directly managed by Views
 - Force unwrapping (use safe unwrapping patterns)
-- Using `@ObservableObject` instead of `@Observable`
+- Using `@ObservableObject` instead of `@Observable` (except for dependency injection containers)
 
 **When violations are found, Claude must:**
 1. Clearly explain **which rule** was broken (reference the section).  
