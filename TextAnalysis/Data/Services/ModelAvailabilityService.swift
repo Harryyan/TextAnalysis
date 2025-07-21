@@ -13,16 +13,13 @@ enum ModelAvailabilityStatus {
     case unavailable(reason: String)
 }
 
-@Observable final class ModelAvailabilityService {
-    var availabilityStatus: ModelAvailabilityStatus = .unavailable(reason: "Checking...")
+@Observable final class ModelAvailabilityService: Sendable {
+    static let shared = ModelAvailabilityService()
     
+    private let availabilityStatus: ModelAvailabilityStatus
     private let systemModel = SystemLanguageModel.default
     
-    init() {
-        checkAvailability()
-    }
-    
-    func checkAvailability() {
+    private init() {
         switch systemModel.availability {
         case .available:
             availabilityStatus = .available
@@ -40,10 +37,6 @@ enum ModelAvailabilityStatus {
             }
             availabilityStatus = .unavailable(reason: reasonText)
         }
-    }
-    
-    func refreshAvailability() {
-        checkAvailability()
     }
     
     var isAvailable: Bool {

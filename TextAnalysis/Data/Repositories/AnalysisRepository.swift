@@ -15,7 +15,7 @@ struct AnalysisRepository: AnalysisRepositoryProtocol {
         self.modelContext = modelContext
     }
     
-    func getCachedResult(for contentHash: String) async -> AnalysisResult? {
+    func getCachedResult(for contentHash: String) async throws -> AnalysisResult? {
         let predicate = #Predicate<AnalysisResult> { result in
             result.contentHash == contentHash
         }
@@ -26,8 +26,7 @@ struct AnalysisRepository: AnalysisRepositoryProtocol {
             let results = try modelContext.fetch(descriptor)
             return results.first
         } catch {
-            print("Failed to fetch cached result: \(error)")
-            return nil
+            throw AnalysisRepositoryError.fetchFailed(error)
         }
     }
     
@@ -67,7 +66,7 @@ struct AnalysisRepository: AnalysisRepositoryProtocol {
     }
     
     func deleteResult(for contentHash: String) async throws {
-        guard let result = await getCachedResult(for: contentHash) else {
+        guard let result = try await getCachedResult(for: contentHash) else {
             return // Already deleted or doesn't exist
         }
         

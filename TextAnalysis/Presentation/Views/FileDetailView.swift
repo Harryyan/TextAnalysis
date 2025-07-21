@@ -1,15 +1,16 @@
 import SwiftUI
 
 struct FileDetailView: View {
+    let file: FileDocument
     @State private var viewModel: FileDetailViewModel
     
     init(file: FileDocument) {
+        self.file = file
         let foundationService = FoundationModelsService()
-        let modelAvailability = ModelAvailabilityService()
         self._viewModel = State(wrappedValue: FileDetailViewModel(
             file: file,
             foundationService: foundationService,
-            modelAvailability: modelAvailability
+            modelAvailability: ModelAvailabilityService.shared
         ))
     }
     
@@ -90,6 +91,14 @@ struct FileDetailView: View {
         }
         .navigationTitle("File Content")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: file) { _, newFile in
+            let foundationService = FoundationModelsService()
+            viewModel = FileDetailViewModel(
+                file: newFile,
+                foundationService: foundationService,
+                modelAvailability: ModelAvailabilityService.shared
+            )
+        }
         .sheet(isPresented: $viewModel.showingSummary) {
             NavigationView {
                 StreamingSummaryView(document: viewModel.documentForSummary, foundationService: viewModel.foundationServiceForSummary)

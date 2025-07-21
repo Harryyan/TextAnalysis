@@ -57,31 +57,29 @@ import FoundationModels
         loadingTask?.cancel()
         loadingTask = Task {
             do {
-                let result = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+                let cachedResult = try await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
                 
                 // Check for cancellation before updating UI
                 try Task.checkCancellation()
                 
-                await MainActor.run {
-                    switch result {
-                    case .success(let cachedResult):
-                        if let cachedResult = cachedResult {
-                            if let cachedSummary = cachedResult.summary {
-                                currentSummary = cachedSummary
-                            }
-                            if let cachedAnalysis = cachedResult.quickAnalysis {
-                                quickAnalysis = cachedAnalysis
-                            }
-                        }
-                    case .failure(let error):
-                        errorMessage = error.userFriendlyMessage
+                if let cachedResult = cachedResult {
+                    if let cachedSummary = cachedResult.summary {
+                        currentSummary = cachedSummary
                     }
-                    loadingTask = nil
+                    if let cachedAnalysis = cachedResult.quickAnalysis {
+                        quickAnalysis = cachedAnalysis
+                    }
                 }
+                loadingTask = nil
             } catch is CancellationError {
-                await MainActor.run {
-                    loadingTask = nil
+                loadingTask = nil
+            } catch {
+                if let fileError = error as? FileError {
+                    errorMessage = fileError.userFriendlyMessage
+                } else {
+                    errorMessage = "Failed to load cached data: \(error.localizedDescription)"
                 }
+                loadingTask = nil
             }
         }
     }
@@ -101,50 +99,41 @@ import FoundationModels
                 let stream = try await foundationService.streamingSummarize(document.content, fileType: document.fileType)
                 
                 for try await partial in stream {
-                    // Check for cancellation
                     try Task.checkCancellation()
                     
-                    await MainActor.run {
-                        partialSummary = partial
-                        updateProgress(partial)
-                        
-                        // If we have a complete summary, convert it
-                        if let title = partial.title,
-                           let overview = partial.overview,
-                           let keyPoints = partial.keyPoints,
-                           let conclusion = partial.conclusion,
-                           let readingTime = partial.estimatedReadingTimeMinutes {
-                            currentSummary = DocumentSummary(
-                                title: title,
-                                overview: overview,
-                                keyPoints: keyPoints,
-                                conclusion: conclusion,
-                                estimatedReadingTimeMinutes: readingTime
-                            )
-                        }
+                    partialSummary = partial
+                    updateProgress(partial)
+                    
+                    // If we have a complete summary, convert it
+                    if let title = partial.title,
+                       let overview = partial.overview,
+                       let keyPoints = partial.keyPoints,
+                       let conclusion = partial.conclusion,
+                       let readingTime = partial.estimatedReadingTimeMinutes {
+                        currentSummary = DocumentSummary(
+                            title: title,
+                            overview: overview,
+                            keyPoints: keyPoints,
+                            conclusion: conclusion,
+                            estimatedReadingTimeMinutes: readingTime
+                        )
                     }
                 }
                 
-                await MainActor.run {
-                    if let summary = currentSummary {
-                        // Start caching task (tracked separately)
-                        startCachingSummary(summary)
-                    }
-                    isGenerating = false
-                    generationProgress = 1.0
-                    generationTask = nil
+                if let summary = currentSummary {
+                    // Start caching task (tracked separately)
+                    startCachingSummary(summary)
                 }
+                isGenerating = false
+                generationProgress = 1.0
+                generationTask = nil
             } catch is CancellationError {
-                await MainActor.run {
-                    isGenerating = false
-                    generationTask = nil
-                }
+                isGenerating = false
+                generationTask = nil
             } catch {
-                await MainActor.run {
-                    errorMessage = handleError(error)
-                    isGenerating = false
-                    generationTask = nil
-                }
+                errorMessage = handleError(error)
+                isGenerating = false
+                generationTask = nil
             }
         }
     }
@@ -165,25 +154,19 @@ import FoundationModels
                 // Check for cancellation
                 try Task.checkCancellation()
                 
-                await MainActor.run {
-                    quickAnalysis = analysis
-                    isAnalyzing = false
-                    analysisTask = nil
-                }
+                quickAnalysis = analysis
+                isAnalyzing = false
+                analysisTask = nil
                 
                 // Start caching task (tracked separately)
                 startCachingQuickAnalysis(analysis)
             } catch is CancellationError {
-                await MainActor.run {
-                    isAnalyzing = false
-                    analysisTask = nil
-                }
+                isAnalyzing = false
+                analysisTask = nil
             } catch {
-                await MainActor.run {
-                    errorMessage = handleError(error)
-                    isAnalyzing = false
-                    analysisTask = nil
-                }
+                errorMessage = handleError(error)
+                isAnalyzing = false
+                analysisTask = nil
             }
         }
     }
@@ -204,14 +187,13 @@ import FoundationModels
     }
     
     private func startCachingSummary(_ summary: DocumentSummary) {
-        // Cancel any existing caching task
         cachingTask?.cancel()
-        
         cachingTask = Task {
-            await cacheSummary(summary)
-            await MainActor.run {
+            defer {
                 cachingTask = nil
             }
+            
+            await cacheSummary(summary)
         }
     }
     
@@ -220,10 +202,11 @@ import FoundationModels
         cachingTask?.cancel()
         
         cachingTask = Task {
-            await cacheQuickAnalysis(analysis)
-            await MainActor.run {
+            defer {
                 cachingTask = nil
             }
+            
+            await cacheQuickAnalysis(analysis)
         }
     }
     
@@ -231,17 +214,14 @@ import FoundationModels
         // Check for cancellation before database operations
         guard !Task.isCancelled else { return }
         
-        let cachedResult = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
-        
-        switch cachedResult {
-        case .success(let existingResult):
+        do {
+            let existingResult = try await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+            
             if let existingResult = existingResult {
                 guard !Task.isCancelled else { return }
                 let updateResult = await documentAnalysisUseCase.updateExistingSummary(existingResult: existingResult, summary: summary)
                 if case .failure(let error) = updateResult {
-                    await MainActor.run {
-                        errorMessage = error.userFriendlyMessage
-                    }
+                    errorMessage = error.userFriendlyMessage
                 }
             } else {
                 guard !Task.isCancelled else { return }
@@ -252,14 +232,14 @@ import FoundationModels
                     summary: summary
                 )
                 if case .failure(let error) = saveResult {
-                    await MainActor.run {
-                        errorMessage = error.userFriendlyMessage
-                    }
+                    errorMessage = error.userFriendlyMessage
                 }
             }
-        case .failure(let error):
-            await MainActor.run {
-                errorMessage = error.userFriendlyMessage
+        } catch {
+            if let fileError = error as? FileError {
+                errorMessage = fileError.userFriendlyMessage
+            } else {
+                errorMessage = "Failed to cache summary: \(error.localizedDescription)"
             }
         }
     }
@@ -268,17 +248,14 @@ import FoundationModels
         // Check for cancellation before database operations
         guard !Task.isCancelled else { return }
         
-        let cachedResult = await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
-        
-        switch cachedResult {
-        case .success(let existingResult):
+        do {
+            let existingResult = try await documentAnalysisUseCase.getCachedAnalysis(for: contentHash)
+            
             if let existingResult = existingResult {
                 guard !Task.isCancelled else { return }
                 let updateResult = await documentAnalysisUseCase.updateExistingQuickAnalysis(existingResult: existingResult, analysis: analysis)
                 if case .failure(let error) = updateResult {
-                    await MainActor.run {
-                        errorMessage = error.userFriendlyMessage
-                    }
+                    errorMessage = error.userFriendlyMessage
                 }
             } else {
                 guard !Task.isCancelled else { return }
@@ -289,14 +266,14 @@ import FoundationModels
                     analysis: analysis
                 )
                 if case .failure(let error) = saveResult {
-                    await MainActor.run {
-                        errorMessage = error.userFriendlyMessage
-                    }
+                    errorMessage = error.userFriendlyMessage
                 }
             }
-        case .failure(let error):
-            await MainActor.run {
-                errorMessage = error.userFriendlyMessage
+        } catch {
+            if let fileError = error as? FileError {
+                errorMessage = fileError.userFriendlyMessage
+            } else {
+                errorMessage = "Failed to cache analysis: \(error.localizedDescription)"
             }
         }
     }

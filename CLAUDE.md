@@ -52,6 +52,20 @@ xcodebuild -project TextAnalysis.xcodeproj -scheme TextAnalysis test
 - **Use `final` keyword for classes without inheritance**: All classes that don't need subclassing should be marked as `final` (e.g., `final class FileRepository: FileRepositoryProtocol`)
 - **Prefer structs over classes**: Use structs for value types and data models when reference semantics aren't needed
 - **Protocol-oriented design**: Define protocols for dependencies and use dependency injection for testability
+- **Task cleanup with `defer`**: Always use `defer` to cleanup task references in async operations to ensure proper cleanup regardless of completion, error, or cancellation:
+  ```swift
+  // Good - guaranteed cleanup
+  task = Task {
+      defer { task = nil }
+      await doWork()
+  }
+  
+  // Bad - cleanup can be skipped on error/cancellation
+  task = Task {
+      await doWork()
+      task = nil
+  }
+  ```
 
 ## Current State
 

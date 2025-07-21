@@ -8,7 +8,7 @@
 import Foundation
 
 protocol DocumentAnalysisUseCaseProtocol {
-    func getCachedAnalysis(for contentHash: String) async -> Result<AnalysisResult?, FileError>
+    func getCachedAnalysis(for contentHash: String) async throws -> AnalysisResult?
     func saveDocumentSummary(contentHash: String, fileName: String, fileType: FileType, summary: DocumentSummary) async -> Result<Void, FileError>
     func saveQuickAnalysis(contentHash: String, fileName: String, fileType: FileType, analysis: QuickAnalysis) async -> Result<Void, FileError>
     func updateExistingSummary(existingResult: AnalysisResult, summary: DocumentSummary) async -> Result<Void, FileError>
@@ -24,12 +24,11 @@ final class DocumentAnalysisUseCase: DocumentAnalysisUseCaseProtocol {
         self.analysisRepository = analysisRepository
     }
     
-    func getCachedAnalysis(for contentHash: String) async -> Result<AnalysisResult?, FileError> {
+    func getCachedAnalysis(for contentHash: String) async throws -> AnalysisResult? {
         do {
-            let result = await analysisRepository.getCachedResult(for: contentHash)
-            return .success(result)
+            return try await analysisRepository.getCachedResult(for: contentHash)
         } catch {
-            return .failure(.storageError(reason: "Failed to retrieve cached analysis: \(error.localizedDescription)"))
+            throw FileError.storageError(reason: "Failed to retrieve cached analysis: \(error.localizedDescription)")
         }
     }
     

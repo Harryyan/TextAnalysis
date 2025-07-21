@@ -7,7 +7,7 @@
 import Foundation
 
 protocol AnalysisRepositoryProtocol {
-    func getCachedResult(for contentHash: String) async -> AnalysisResult?
+    func getCachedResult(for contentHash: String) async throws -> AnalysisResult?
     func saveAnalysisResult(_ result: AnalysisResult) async throws
     func updateSummary(existingResult: AnalysisResult, summary: DocumentSummary) async throws
     func updateQuickAnalysis(existingAnalysisResult: AnalysisResult, analysis: QuickAnalysis) async throws
