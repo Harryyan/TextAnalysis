@@ -20,8 +20,8 @@ import FoundationModels
     var generationProgress: Double = 0.0
     
     private let documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol
+    private let documentSummaryUseCase: DocumentSummaryUseCaseProtocol
     private var contentHash: String = ""
-    private let foundationService: FoundationModelsService
     private let document: FileDocument
     
     // Comprehensive task tracking for cancellation
@@ -30,10 +30,10 @@ import FoundationModels
     private var loadingTask: Task<Void, Error>?
     private var cachingTask: Task<Void, Never>?
     
-    init(document: FileDocument, foundationService: FoundationModelsService, documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol) {
+    init(document: FileDocument, documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol, documentSummaryUseCase: DocumentSummaryUseCaseProtocol) {
         self.document = document
-        self.foundationService = foundationService
         self.documentAnalysisUseCase = documentAnalysisUseCase
+        self.documentSummaryUseCase = documentSummaryUseCase
         self.contentHash = AnalysisResult.generateContentHash(for: document.content)
     }
     
@@ -95,43 +95,51 @@ import FoundationModels
         generationProgress = 0.0
         
         generationTask = Task {
-            do {
-                let stream = try await foundationService.streamingSummarize(document.content, fileType: document.fileType)
-                
-                for try await partial in stream {
-                    try Task.checkCancellation()
-                    
-                    partialSummary = partial
-                    updateProgress(partial)
-                    
-                    // If we have a complete summary, convert it
-                    if let title = partial.title,
-                       let overview = partial.overview,
-                       let keyPoints = partial.keyPoints,
-                       let conclusion = partial.conclusion,
-                       let readingTime = partial.estimatedReadingTimeMinutes {
-                        currentSummary = DocumentSummary(
-                            title: title,
-                            overview: overview,
-                            keyPoints: keyPoints,
-                            conclusion: conclusion,
-                            estimatedReadingTimeMinutes: readingTime
-                        )
+            let result = await documentSummaryUseCase.streamingSummarize(for: document)
+            
+            switch result {
+            case .success(let stream):
+                do {
+                    for try await partial in stream {
+                        try Task.checkCancellation()
+                        
+                        partialSummary = partial
+                        updateProgress(partial)
+                        
+                        // If we have a complete summary, convert it
+                        if let title = partial.title,
+                           let overview = partial.overview,
+                           let keyPoints = partial.keyPoints,
+                           let conclusion = partial.conclusion,
+                           let readingTime = partial.estimatedReadingTimeMinutes {
+                            currentSummary = DocumentSummary(
+                                title: title,
+                                overview: overview,
+                                keyPoints: keyPoints,
+                                conclusion: conclusion,
+                                estimatedReadingTimeMinutes: readingTime
+                            )
+                        }
                     }
+                    
+                    if let summary = currentSummary {
+                        // Start caching task (tracked separately)
+                        startCachingSummary(summary)
+                    }
+                    isGenerating = false
+                    generationProgress = 1.0
+                    generationTask = nil
+                } catch is CancellationError {
+                    isGenerating = false
+                    generationTask = nil
+                } catch {
+                    errorMessage = handleAIError(error)
+                    isGenerating = false
+                    generationTask = nil
                 }
                 
-                if let summary = currentSummary {
-                    // Start caching task (tracked separately)
-                    startCachingSummary(summary)
-                }
-                isGenerating = false
-                generationProgress = 1.0
-                generationTask = nil
-            } catch is CancellationError {
-                isGenerating = false
-                generationTask = nil
-            } catch {
-                errorMessage = handleError(error)
+            case .failure(let aiError):
+                errorMessage = aiError.userFriendlyMessage
                 isGenerating = false
                 generationTask = nil
             }
@@ -148,11 +156,16 @@ import FoundationModels
         errorMessage = nil
         
         analysisTask = Task {
-            do {
-                let analysis = try await foundationService.quickAnalyze(document.content, fileType: document.fileType)
-                
+            let result = await documentSummaryUseCase.quickAnalyze(for: document)
+            
+            switch result {
+            case .success(let analysis):
                 // Check for cancellation
-                try Task.checkCancellation()
+                guard !Task.isCancelled else {
+                    isAnalyzing = false
+                    analysisTask = nil
+                    return
+                }
                 
                 quickAnalysis = analysis
                 isAnalyzing = false
@@ -160,18 +173,22 @@ import FoundationModels
                 
                 // Start caching task (tracked separately)
                 startCachingQuickAnalysis(analysis)
-            } catch is CancellationError {
-                isAnalyzing = false
-                analysisTask = nil
-            } catch {
-                errorMessage = handleError(error)
+                
+            case .failure(let aiError):
+                guard !Task.isCancelled else {
+                    isAnalyzing = false
+                    analysisTask = nil
+                    return
+                }
+                
+                errorMessage = aiError.userFriendlyMessage
                 isAnalyzing = false
                 analysisTask = nil
             }
         }
     }
     
-    func switchDocument(to newDocument: FileDocument, foundationService: FoundationModelsService) {
+    func switchDocument(to newDocument: FileDocument) {
         // Cancel all ongoing tasks before switching
         cancelAllTasks()
         
@@ -278,8 +295,13 @@ import FoundationModels
         }
     }
     
-    private func handleError(_ error: Error) -> String {
-        // Handle Apple Foundation Models specific errors
+    private func handleAIError(_ error: Error) -> String {
+        // Handle AIError from domain layer
+        if let aiError = error as? AIError {
+            return aiError.userFriendlyMessage
+        }
+        
+        // Handle Apple Foundation Models specific errors (fallback for direct errors)
         if let generationError = error as? LanguageModelSession.GenerationError {
             switch generationError {
             case .exceededContextWindowSize:
@@ -303,7 +325,7 @@ import FoundationModels
             }
         }
         
-        // Handle our custom service errors
+        // Handle our custom service errors (fallback)
         if let foundationError = error as? FoundationModelsError {
             switch foundationError {
             case .contextWindowExceeded:

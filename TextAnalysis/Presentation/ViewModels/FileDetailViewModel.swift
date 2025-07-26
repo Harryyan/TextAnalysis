@@ -13,8 +13,7 @@ import Foundation
     var isPrewarming = false
     
     private let file: FileDocument
-    private let foundationService: FoundationModelsService
-    private let modelAvailability: ModelAvailabilityService
+    private let documentSummaryUseCase: DocumentSummaryUseCaseProtocol
     
     var fileName: String {
         file.fileName
@@ -45,31 +44,34 @@ import Foundation
     }
     
     var isModelAvailable: Bool {
-        modelAvailability.isAvailable
+        let result = documentSummaryUseCase.checkModelAvailability()
+        switch result {
+        case .success(let isAvailable):
+            return isAvailable
+        case .failure(_):
+            return false
+        }
     }
     
     var unavailabilityReason: String? {
-        modelAvailability.getUnavailabilityReason()
+        return documentSummaryUseCase.getUnavailabilityReason()
     }
     
-    var foundationServiceForSummary: FoundationModelsService {
-        foundationService
-    }
-    
-    init(file: FileDocument, foundationService: FoundationModelsService, modelAvailability: ModelAvailabilityService) {
+    init(file: FileDocument, documentSummaryUseCase: DocumentSummaryUseCaseProtocol) {
         self.file = file
-        self.foundationService = foundationService
-        self.modelAvailability = modelAvailability
+        self.documentSummaryUseCase = documentSummaryUseCase
     }
     
     func prewarmAndShowSummary() {
         isPrewarming = true
         
         Task {
-            do {
-                try await foundationService.prewarmSession()
-            } catch {
-                print("Prewarming failed: \(error)")
+            let result = await documentSummaryUseCase.prewarmModel()
+            switch result {
+            case .success():
+                break // Success, no action needed
+            case .failure(let error):
+                print("Prewarming failed: \(error.userFriendlyMessage)")
             }
             
             isPrewarming = false

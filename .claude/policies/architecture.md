@@ -8,9 +8,15 @@ This project uses **Clean Architecture + MVVM with SwiftUI**, aiming to enforce 
 
 Claude Code must respect the dependency rule:
 
-- Outer layers depend on inner layers, never the reverse.
-- Dependencies are always injected via protocols (inversion of control).
+- **Inner layers must never depend on outer layers** (the core rule).
+- Outer layers may depend on other outer layers (e.g., UI can use DIContainer).
+- Outer layers should depend on inner layers through protocols (inversion of control).
 - UI and data sources are volatile; domain logic is the most stable.
+
+**Layer Dependencies (Outer → Inner):**
+- UI Layer (Views) → Presentation Layer (ViewModels) → Domain Layer (UseCases) → Entities
+- Infrastructure (DIContainer, Repositories) → Domain Layer (Protocols, UseCases)
+- Views may use DIContainer (both are outer layers) - this is architecturally compliant.
 
 ---
 
@@ -28,6 +34,7 @@ Claude Code must respect the dependency rule:
 - Keep views as "dumb" as possible — no business logic, no branching.
 - Avoid any direct usage of UseCase or Repository in views.
 - Rely on ViewModel for all state values, event dispatch, and actions.
+- Views may use DIContainer via @EnvironmentObject for ViewModel creation (this is Clean Architecture compliant).
 
 ---
 

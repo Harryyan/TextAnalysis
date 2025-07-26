@@ -24,25 +24,33 @@ final class DIContainer: ObservableObject {
     }
     
     func makeStreamingSummaryViewModel(document: FileDocument, modelContext: ModelContext) -> StreamingSummaryViewModel {
+        // AI-related dependencies
         let foundationService = FoundationModelsService()
+        let modelAvailability = ModelAvailabilityService.shared
+        let aiRepository = AIRepository(foundationService: foundationService, modelAvailability: modelAvailability)
+        let documentSummaryUseCase = DocumentSummaryUseCase(aiRepository: aiRepository)
+        
+        // Analysis-related dependencies
         let analysisRepository = AnalysisRepository(modelContext: modelContext)
         let documentAnalysisUseCase = DocumentAnalysisUseCase(analysisRepository: analysisRepository)
         
         return StreamingSummaryViewModel(
             document: document,
-            foundationService: foundationService,
-            documentAnalysisUseCase: documentAnalysisUseCase
+            documentAnalysisUseCase: documentAnalysisUseCase,
+            documentSummaryUseCase: documentSummaryUseCase
         )
     }
     
     func makeFileDetailViewModel(file: FileDocument) -> FileDetailViewModel {
+        // Create AI-related dependencies
         let foundationService = FoundationModelsService()
         let modelAvailability = ModelAvailabilityService.shared
+        let aiRepository = AIRepository(foundationService: foundationService, modelAvailability: modelAvailability)
+        let documentSummaryUseCase = DocumentSummaryUseCase(aiRepository: aiRepository)
         
         return FileDetailViewModel(
             file: file,
-            foundationService: foundationService,
-            modelAvailability: modelAvailability
+            documentSummaryUseCase: documentSummaryUseCase
         )
     }
 }
