@@ -24,13 +24,31 @@ import FoundationModels
     private var contentHash: String = ""
     private let document: FileDocument
     
+    // MARK: - Public Properties for View
+    var fileName: String {
+        document.fileName
+    }
+    
+    var fileTypeDisplayName: String {
+        document.fileType.displayName
+    }
+    
+    var contentCharacterCount: Int {
+        document.content.count
+    }
+    
+    var fileType: FileType {
+        document.fileType
+    }
+    
+    // MARK: - Task Management
     // Comprehensive task tracking for cancellation
     private var generationTask: Task<Void, Never>?
     private var analysisTask: Task<Void, Never>?
     private var loadingTask: Task<Void, Error>?
     private var cachingTask: Task<Void, Never>?
     
-    init(document: FileDocument, documentAnalysisUseCase: DocumentAnalysisUseCaseProtocol, documentSummaryUseCase: DocumentSummaryUseCaseProtocol) {
+    init(document: FileDocument, documentAnalysisUseCase: some DocumentAnalysisUseCaseProtocol, documentSummaryUseCase: some DocumentSummaryUseCaseProtocol) {
         self.document = document
         self.documentAnalysisUseCase = documentAnalysisUseCase
         self.documentSummaryUseCase = documentSummaryUseCase

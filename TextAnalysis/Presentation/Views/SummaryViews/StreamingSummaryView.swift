@@ -52,7 +52,8 @@ struct StreamingSummaryView: View {
                         .onChange(of: viewModel.isGenerating) { _, generating in
                             // Auto-scroll when generation completes
                             if !generating && viewModel.currentSummary != nil {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                Task {
+                                    try? await Task.sleep(for: .milliseconds(100))
                                     withAnimation(.easeInOut(duration: 0.5)) {
                                         proxy.scrollTo("completedSummary", anchor: .bottom)
                                     }
@@ -88,14 +89,14 @@ struct StreamingSummaryView: View {
                 .font(.title2)
                 .bold()
             
-            Text(document.fileName)
+            Text(viewModel?.fileName ?? "")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
             HStack {
-                Label("Type: \(document.fileType.displayName)", systemImage: "doc.text")
+                Label("Type: \(viewModel?.fileType.displayName ?? "")", systemImage: "doc.text")
                 Spacer()
-                Label("Size: \(document.content.count) chars", systemImage: "info.circle")
+                Label("Size: \(viewModel?.contentCharacterCount ?? 0) chars", systemImage: "info.circle")
             }
             .font(.caption)
             .foregroundColor(.secondary)

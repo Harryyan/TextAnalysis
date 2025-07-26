@@ -88,13 +88,13 @@ struct FileDetailView: View {
                 )) {
                     NavigationView {
                         StreamingSummaryView(document: viewModel.documentForSummary)
-                            .toolbar {
-                                ToolbarItem(placement: .navigationBarLeading) {
-                                    Button("Close") {
-                                        viewModel.showingSummary = false
-                                    }
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Close") {
+                                    viewModel.showingSummary = false
                                 }
                             }
+                        }
                     }
                 }
             } else {

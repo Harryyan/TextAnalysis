@@ -66,7 +66,9 @@ xcodebuild -project TextAnalysis.xcodeproj -scheme TextAnalysis test
       task = nil
   }
   ```
-- **SwiftUI `.task {}` modifier exception**: The `.task {}` modifier is acceptable in SwiftUI views as it's a proper SwiftUI pattern for handling async work tied to view lifecycle
+- **SwiftUI async exceptions**: 
+  - The `.task {}` modifier is acceptable in SwiftUI views as it's a proper SwiftUI pattern for handling async work tied to view lifecycle
+  - Brief `Task { }` blocks are acceptable in SwiftUI views for UI-related async work (animations, scroll positioning, etc.) but should not contain business logic
 
 ## Current State
 

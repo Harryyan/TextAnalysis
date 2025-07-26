@@ -25,6 +25,16 @@
   Claude must refactor any usage of `ObservableObject` to `@Observable`.
   **Exception**: `@EnvironmentObject` and `ObservableObject` are allowed when used together for dependency injection patterns (e.g., DIContainer).
 
+- **Use `some` keyword for protocol parameters in initializers and function signatures.**  
+  When accepting protocol types as parameters, prefer `some ProtocolName` over bare `ProtocolName` for better type safety and performance.
+  ```swift
+  // Preferred
+  init(useCase: some UseCaseProtocol, repository: some RepositoryProtocol)
+  
+  // Avoid
+  init(useCase: UseCaseProtocol, repository: RepositoryProtocol)
+  ```
+
 ## 2. File-Level Rules
 
 - Each Swift file must contain only one public type.  
