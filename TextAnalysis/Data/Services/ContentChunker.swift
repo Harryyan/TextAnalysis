@@ -166,7 +166,7 @@ final class ContentChunker {
         var lastEnd = content.startIndex
         
         for match in matches {
-            let matchRange = Range(match.range, in: content)!
+            guard let matchRange = Range(match.range, in: content) else { continue }
             let sentence = String(content[lastEnd..<matchRange.lowerBound])
             if !sentence.trimmingCharacters(in: .whitespaces).isEmpty {
                 sentences.append(sentence.trimmingCharacters(in: .whitespaces))
