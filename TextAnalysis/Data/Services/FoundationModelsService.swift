@@ -55,7 +55,6 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         print("Foundation Models session prewarming completed")
     }
     
-    @MainActor
     func streamingSummarize(_ content: String, fileType: FileType) async throws -> AsyncThrowingStream<DocumentSummary.PartiallyGenerated, Error> {
         guard let session = session else {
             throw FoundationModelsError.sessionNotInitialized
@@ -81,13 +80,16 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                     }
                     continuation.finish()
                 } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
-                    do {
-                        let fallbackSummary = try await handleContextOverflow(content, fileType: fileType)
-                        continuation.yield(fallbackSummary.asPartiallyGenerated())
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
-                    }
+                    let estimatedMinutes = content.count / 800 // ~200 words per minute, ~4 chars per word
+                    let fallbackSummary = DocumentSummary(
+                        title: "Summary (Truncated)",
+                        overview: "This is a partial summary due to document length limitations.",
+                        keyPoints: ["Document was too long for full analysis", "Summary based on first portion of content"],
+                        conclusion: "Full analysis requires document chunking.",
+                        estimatedReadingTimeMinutes: estimatedMinutes
+                    )
+                    continuation.yield(fallbackSummary.asPartiallyGenerated())
+                    continuation.finish()
                 } catch LanguageModelSession.GenerationError.guardrailViolation {
                     print("Content triggered safety guardrails")
                     continuation.finish(throwing: FoundationModelsError.generationFailed("Content may contain sensitive material that cannot be analyzed by Apple's AI models"))

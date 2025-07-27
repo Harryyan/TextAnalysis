@@ -52,11 +52,8 @@ struct StreamingSummaryView: View {
                         .onChange(of: viewModel.isGenerating) { _, generating in
                             // Auto-scroll when generation completes
                             if !generating && viewModel.currentSummary != nil {
-                                Task {
-                                    try? await Task.sleep(for: .milliseconds(100))
-                                    withAnimation(.easeInOut(duration: 0.5)) {
-                                        proxy.scrollTo("completedSummary", anchor: .bottom)
-                                    }
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    proxy.scrollTo("completedSummary", anchor: .bottom)
                                 }
                             }
                         }

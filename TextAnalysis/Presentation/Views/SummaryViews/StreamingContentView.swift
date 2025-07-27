@@ -18,6 +18,7 @@ struct StreamingContentView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(title)
+                        .contentTransition(.opacity)
                         .font(.headline)
                         .bold()
                 }
@@ -29,6 +30,7 @@ struct StreamingContentView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(overview)
+                        .contentTransition(.opacity)
                         .font(.body)
                 }
             }
@@ -37,6 +39,7 @@ struct StreamingContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Key Points (\(keyPoints.count))")
                         .font(.caption)
+                        .contentTransition(.opacity)
                         .foregroundColor(.secondary)
                     ForEach(Array(keyPoints.enumerated()), id: \.offset) { index, point in
                         HStack(alignment: .top, spacing: 6) {
@@ -44,6 +47,7 @@ struct StreamingContentView: View {
                                 .foregroundColor(.blue)
                                 .bold()
                             Text(point)
+                                .contentTransition(.opacity)
                                 .font(.callout)
                         }
                     }
@@ -56,6 +60,7 @@ struct StreamingContentView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(conclusion)
+                        .contentTransition(.opacity)
                         .font(.body)
                 }
             }
@@ -71,6 +76,7 @@ struct StreamingContentView: View {
                 .padding(.top, 8)
             }
         }
+        .animation(.easeInOut, value: partial)
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(8)
