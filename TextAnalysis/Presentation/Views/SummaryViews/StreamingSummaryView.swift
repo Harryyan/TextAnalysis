@@ -67,7 +67,7 @@ struct StreamingSummaryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("AI Summary")
+        .navigationTitle(.aiSummary)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if viewModel == nil {
@@ -223,7 +223,7 @@ struct StreamingSummaryView: View {
                 
                 ForEach(Array(summary.keyPoints.enumerated()), id: \.offset) { index, point in
                     HStack(alignment: .top, spacing: 8) {
-                        Text("\(index + 1).")
+                        Text(.keypoint(index + 1))
                             .font(.body)
                             .foregroundColor(.blue)
                             .bold()
