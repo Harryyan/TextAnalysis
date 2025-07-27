@@ -12,7 +12,7 @@ final class AIRepository: AIRepositoryProtocol {
     private let foundationService: FoundationModelsServiceProtocol
     private let modelAvailability: ModelAvailabilityService
     
-    init(foundationService: FoundationModelsServiceProtocol, modelAvailability: ModelAvailabilityService) {
+    init(foundationService: some FoundationModelsServiceProtocol, modelAvailability: ModelAvailabilityService) {
         self.foundationService = foundationService
         self.modelAvailability = modelAvailability
     }

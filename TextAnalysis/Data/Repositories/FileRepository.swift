@@ -12,7 +12,7 @@ struct FileRepository: FileRepositoryProtocol {
     private let modelContext: ModelContext
     private let fileReaderService: FileReaderServiceProtocol
     
-    init(modelContext: ModelContext, fileReaderService: FileReaderServiceProtocol) {
+    init(modelContext: ModelContext, fileReaderService: some FileReaderServiceProtocol) {
         self.modelContext = modelContext
         self.fileReaderService = fileReaderService
     }
