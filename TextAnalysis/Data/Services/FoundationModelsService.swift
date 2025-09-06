@@ -76,11 +76,11 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                     )
                     
                     for try await summary in stream {
-                        continuation.yield(summary)
+                        continuation.yield(summary.content)
                     }
                     continuation.finish()
                 } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
-                    let estimatedMinutes = content.count / 800 // ~200 words per minute, ~4 chars per word
+                    let estimatedMinutes = max(1, content.count / 1125) // ~225 words per minute, ~5 chars per word
                     let fallbackSummary = DocumentSummary(
                         title: "Summary (Truncated)",
                         overview: "This is a partial summary due to document length limitations.",
@@ -273,6 +273,12 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
         return content.count / 4
     }
     
+    private func estimateReadingTime(_ content: String) -> Int {
+        // Average reading speed: 225 words per minute
+        // Average word length: ~5 characters (including spaces)
+        return max(1, content.count / 1125)
+    }
+    
     private func truncateContent(_ content: String, maxTokens: Int) -> String {
         let maxCharacters = maxTokens * 4
         
@@ -298,7 +304,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
     
     private func handleContextOverflow(_ content: String, fileType: FileType) async throws -> DocumentSummary {
         // For context overflow, generate a basic summary from truncated content
-        let estimatedMinutes = estimateTokenCount(content) / 200 // ~200 words per minute
+        let estimatedMinutes = max(1, content.count / 1125) // ~225 words per minute, ~5 chars per word
         
         return DocumentSummary(
             title: "Summary (Truncated)",
